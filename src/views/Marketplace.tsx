@@ -13,7 +13,7 @@ import {
   ExternalLink,
   Sparkles,
 } from 'lucide-react';
-import { supabase, type Kiosk, type KioskItem, type TransferPolicy, type EscrowTransaction } from '@/lib/supabase';
+import { kioskStorage, type Kiosk, type KioskItem, type TransferPolicy, type EscrowTransaction } from '@/lib/supabase';
 import {
   generateStellarAddress,
   generateTxHash,
@@ -42,19 +42,17 @@ export function Marketplace() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const { data: kData } = await supabase.from('kiosks').select('*').order('created_at').limit(1).maybeSingle();
+    const kData = await kioskStorage.getKiosk();
     if (kData) {
-      setKiosk(kData as Kiosk);
-      const { data: iData } = await supabase.from('kiosk_items').select('*').eq('kiosk_id', kData.id).order('created_at', { ascending: false });
-      setItems((iData as KioskItem[]) || []);
+      setKiosk(kData);
+      const iData = await kioskStorage.getItems(kData.id);
+      setItems(iData);
 
-      const { data: pData } = await supabase.from('transfer_policies').select('*');
-      const pm: Record<string, TransferPolicy> = {};
-      (pData as TransferPolicy[])?.forEach((p) => { pm[p.item_id] = p; });
+      const pm = await kioskStorage.getPolicies();
       setPolicies(pm);
 
-      const { data: tData } = await supabase.from('escrow_transactions').select('*').eq('kiosk_id', kData.id).order('created_at', { ascending: false }).limit(20);
-      setTransactions((tData as EscrowTransaction[]) || []);
+      const tData = await kioskStorage.getTransactions(kData.id);
+      setTransactions(tData);
     }
     setLoading(false);
   }, []);
@@ -98,13 +96,12 @@ export function Marketplace() {
       status: policy.escrow_mode === 'INSTANT' ? 'SETTLED' : 'PENDING',
     };
 
-    const { data, error } = await supabase.from('escrow_transactions').insert(newTx).select().maybeSingle();
-    if (!error && data) {
-      const tx = data as EscrowTransaction;
-      setCompletedTx(tx);
-      setTransactions([tx, ...transactions]);
-      await supabase.from('kiosks').update({ total_sales_volume: Number(kiosk.total_sales_volume) + selectedItem.price }).eq('id', kiosk.id);
-    }
+    const tx = await kioskStorage.recordTransaction(newTx);
+    setCompletedTx(tx);
+    setTransactions([tx, ...transactions]);
+    await kioskStorage.updateKiosk({
+      total_sales_volume: Number(kiosk.total_sales_volume) + selectedItem.price,
+    });
     setCheckoutStep('done');
   };
 

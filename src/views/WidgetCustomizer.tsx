@@ -11,7 +11,7 @@ import {
   Smartphone,
   Monitor,
 } from 'lucide-react';
-import { supabase, type Kiosk, type KioskItem, type WidgetConfig } from '@/lib/supabase';
+import { kioskStorage, type Kiosk, type KioskItem, type WidgetConfig } from '@/lib/supabase';
 import { formatTokenAmount } from '@/lib/stellar';
 import { Panel, SectionTitle, Badge, Button, Input, Label, Toggle } from '@/components/ui';
 
@@ -27,29 +27,15 @@ export function WidgetCustomizer() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const { data: kData } = await supabase.from('kiosks').select('*').order('created_at').limit(1).maybeSingle();
+    const kData = await kioskStorage.getKiosk();
     if (kData) {
-      setKiosk(kData as Kiosk);
-      const { data: iData } = await supabase.from('kiosk_items').select('*').eq('kiosk_id', kData.id).order('created_at');
-      const itemsList = (iData as KioskItem[]) || [];
+      setKiosk(kData);
+      const itemsList = await kioskStorage.getItems(kData.id);
       setItems(itemsList);
       if (itemsList.length > 0) setPreviewItem(itemsList[0]);
 
-      const { data: wData } = await supabase
-        .from('widget_configs')
-        .select('*')
-        .eq('kiosk_id', kData.id)
-        .maybeSingle();
-      if (wData) {
-        setConfig(wData as WidgetConfig);
-      } else {
-        const { data: newConfig } = await supabase
-          .from('widget_configs')
-          .insert({ kiosk_id: kData.id, theme: 'dark', accent_color: '#00E5FF', button_text: 'Buy via StellarKiosk', show_preview: true, border_radius: 12 })
-          .select()
-          .maybeSingle();
-        if (newConfig) setConfig(newConfig as WidgetConfig);
-      }
+      const wData = await kioskStorage.getWidgetConfig(kData.id);
+      setConfig(wData);
     }
     setLoading(false);
   }, []);
@@ -60,9 +46,8 @@ export function WidgetCustomizer() {
 
   const updateConfig = async (patch: Partial<WidgetConfig>) => {
     if (!config) return;
-    const updated = { ...config, ...patch };
+    const updated = await kioskStorage.updateWidgetConfig({ ...patch, kiosk_id: kiosk?.id });
     setConfig(updated);
-    await supabase.from('widget_configs').update(patch).eq('id', config.id);
   };
 
   const copyToClipboard = (text: string, key: string) => {

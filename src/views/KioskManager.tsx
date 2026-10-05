@@ -13,7 +13,7 @@ import {
   Layers,
   Lock,
 } from 'lucide-react';
-import { supabase, type Kiosk, type KioskItem } from '@/lib/supabase';
+import { kioskStorage, type Kiosk, type KioskItem } from '@/lib/supabase';
 import {
   generateStellarAddress,
   generateContractId,
@@ -52,15 +52,11 @@ export function KioskManager() {
 
   const loadKiosk = useCallback(async () => {
     setLoading(true);
-    const { data: kData } = await supabase.from('kiosks').select('*').order('created_at').limit(1).maybeSingle();
+    const kData = await kioskStorage.getKiosk();
     if (kData) {
-      setKiosk(kData as Kiosk);
-      const { data: iData } = await supabase
-        .from('kiosk_items')
-        .select('*')
-        .eq('kiosk_id', kData.id)
-        .order('created_at', { ascending: false });
-      setItems((iData as KioskItem[]) || []);
+      setKiosk(kData);
+      const iData = await kioskStorage.getItems(kData.id);
+      setItems(iData);
     }
     setLoading(false);
   }, []);
@@ -72,49 +68,36 @@ export function KioskManager() {
   const initializeKiosk = async (name: string, description: string, token: string) => {
     const owner = address || generateStellarAddress();
     const contractId = generateContractId();
-    const { data, error } = await supabase
-      .from('kiosks')
-      .update({
-        name,
-        description,
-        settlement_token: token,
-        is_initialized: true,
-        owner_address: owner,
-        contract_id: contractId,
-      })
-      .eq('id', kiosk!.id)
-      .select()
-      .maybeSingle();
-    if (!error && data) {
-      setKiosk(data as Kiosk);
-      setInitModalOpen(false);
-    }
+    const updated = await kioskStorage.updateKiosk({
+      name,
+      description,
+      settlement_token: token,
+      is_initialized: true,
+      owner_address: owner,
+      contract_id: contractId,
+    });
+    setKiosk(updated);
+    setInitModalOpen(false);
   };
 
   const addItem = async () => {
     if (!kiosk || !newItem.title) return;
-    const { data, error } = await supabase
-      .from('kiosk_items')
-      .insert({
-        kiosk_id: kiosk.id,
-        title: newItem.title,
-        description: newItem.description,
-        asset_type: newItem.asset_type,
-        price: parseFloat(newItem.price) || 0,
-        icon: newItem.icon,
-        status: 'AVAILABLE',
-      })
-      .select()
-      .maybeSingle();
-    if (!error && data) {
-      setItems([data as KioskItem, ...items]);
-      setNewItem({ title: '', description: '', asset_type: 'License', price: '0', icon: 'Package' });
-      setAddItemOpen(false);
-    }
+    const created = await kioskStorage.addItem({
+      kiosk_id: kiosk.id,
+      title: newItem.title,
+      description: newItem.description,
+      asset_type: newItem.asset_type,
+      price: parseFloat(newItem.price) || 0,
+      icon: newItem.icon,
+      status: 'AVAILABLE',
+    });
+    setItems([created, ...items]);
+    setNewItem({ title: '', description: '', asset_type: 'License', price: '0', icon: 'Package' });
+    setAddItemOpen(false);
   };
 
   const deleteItem = async (id: string) => {
-    await supabase.from('kiosk_items').delete().eq('id', id);
+    await kioskStorage.deleteItem(id);
     setItems(items.filter((i) => i.id !== id));
   };
 

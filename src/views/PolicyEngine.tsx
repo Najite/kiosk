@@ -11,7 +11,7 @@ import {
   Zap,
   ScrollText,
 } from 'lucide-react';
-import { supabase, type Kiosk, type KioskItem, type TransferPolicy, type UpstreamRecipient } from '@/lib/supabase';
+import { kioskStorage, type Kiosk, type KioskItem, type TransferPolicy, type UpstreamRecipient } from '@/lib/supabase';
 import { bpsToPercent, formatTokenAmount, formatDuration, calculatePayouts } from '@/lib/stellar';
 import { Panel, SectionTitle, Badge, Button, Input, Label, EmptyState, StatCard } from '@/components/ui';
 
@@ -28,25 +28,13 @@ export function PolicyEngine() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const { data: kData } = await supabase.from('kiosks').select('*').order('created_at').limit(1).maybeSingle();
+    const kData = await kioskStorage.getKiosk();
     if (kData) {
-      setKiosk(kData as Kiosk);
-      const { data: iData } = await supabase
-        .from('kiosk_items')
-        .select('*')
-        .eq('kiosk_id', kData.id)
-        .order('created_at', { ascending: false });
-      const itemsList = (iData as KioskItem[]) || [];
+      setKiosk(kData);
+      const itemsList = await kioskStorage.getItems(kData.id);
       setItems(itemsList);
 
-      const { data: pData } = await supabase
-        .from('transfer_policies')
-        .select('*')
-        .in('item_id', itemsList.map((i) => i.id));
-      const policyMap: Record<string, TransferPolicy> = {};
-      (pData as TransferPolicy[])?.forEach((p) => {
-        policyMap[p.item_id] = p;
-      });
+      const policyMap = await kioskStorage.getPolicies();
       setPolicies(policyMap);
       if (itemsList.length > 0 && !selectedItemId) {
         setSelectedItemId(itemsList[0].id);
@@ -109,6 +97,7 @@ export function PolicyEngine() {
     if (!draft || !selectedItemId) return;
     setSaving(true);
     const payload = {
+      id: draft.id,
       item_id: selectedItemId,
       min_royalty_bps: draft.min_royalty_bps,
       upstream_split_bps: draft.upstream_split_bps,
@@ -116,28 +105,9 @@ export function PolicyEngine() {
       timelock_seconds: draft.timelock_seconds,
       escrow_mode: draft.escrow_mode,
     };
-    if (draft.id) {
-      const { data, error } = await supabase
-        .from('transfer_policies')
-        .update(payload)
-        .eq('id', draft.id)
-        .select()
-        .maybeSingle();
-      if (!error && data) {
-        setPolicies({ ...policies, [selectedItemId]: data as TransferPolicy });
-        setDraft(data as TransferPolicy);
-      }
-    } else {
-      const { data, error } = await supabase
-        .from('transfer_policies')
-        .insert(payload)
-        .select()
-        .maybeSingle();
-      if (!error && data) {
-        setPolicies({ ...policies, [selectedItemId]: data as TransferPolicy });
-        setDraft(data as TransferPolicy);
-      }
-    }
+    const updated = await kioskStorage.savePolicy(payload);
+    setPolicies({ ...policies, [selectedItemId]: updated });
+    setDraft(updated);
     setSaving(false);
     setSaved(true);
     setTimeout(() => setSaved(false), 2500);
