@@ -174,6 +174,11 @@ export function WalletProvider({ children }: { children: ReactNode }) {
 
   const setNetwork = async (n: Network) => {
     setNetworkState(n);
+    if (address) {
+      const info = await fetchLiveAccount(address, n);
+      setAccountExists(info.exists);
+      setXlmBalance(info.xlmBalance);
+    }
   };
 
   const fundAccount = async (): Promise<boolean> => {
