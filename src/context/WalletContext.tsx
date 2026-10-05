@@ -18,7 +18,7 @@ export type WalletContextType = {
   isFreighterInstalled: boolean;
   isSimulated: boolean;
   error: string | null;
-  connect: () => Promise<void>;
+  connect: () => Promise<boolean>;
   connectSimulated: () => void;
   disconnect: () => void;
   setNetwork: (n: Network) => void;
@@ -53,15 +53,15 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const connect = async () => {
+  const connect = async (): Promise<boolean> => {
     setError(null);
     try {
       const conn = await freighterIsConnected();
       if (!conn?.isConnected) {
-        // Fallback to simulated if user does not have extension installed
-        connectSimulated();
-        return;
+        setIsFreighterInstalled(false);
+        return false;
       }
+      setIsFreighterInstalled(true);
 
       // Request user authorization in Freighter
       const accessObj = await freighterRequestAccess();
@@ -90,14 +90,14 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         } catch {
           // Keep current network
         }
+        return true;
       } else {
         throw new Error('Could not retrieve address from Freighter.');
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Wallet connection error';
       setError(msg);
-      // Fallback to simulated so the user can still test the demo seamlessly
-      connectSimulated();
+      return false;
     }
   };
 

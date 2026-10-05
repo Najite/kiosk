@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { useWallet } from '@/context/WalletContext';
 import { shortAddress } from '@/lib/stellar';
+import { ConnectModal } from '@/components/ConnectModal';
 
 export type ViewId = 'kiosk' | 'policy' | 'widget' | 'marketplace' | 'grant';
 
@@ -32,11 +33,19 @@ export function TopBar({
   onViewChange: (v: ViewId) => void;
   onExit: () => void;
 }) {
-  const { address, isConnected, connect, disconnect, network, setNetwork, shortAddr, isSimulated } = useWallet();
+  const { address, isConnected, connect, connectSimulated, disconnect, network, setNetwork, shortAddr, isSimulated } = useWallet();
   const [walletOpen, setWalletOpen] = useState(false);
   const [netOpen, setNetOpen] = useState(false);
+  const [showConnectModal, setShowConnectModal] = useState(false);
   const walletRef = useRef<HTMLDivElement>(null);
   const netRef = useRef<HTMLDivElement>(null);
+
+  const handleConnectClick = async () => {
+    const success = await connect();
+    if (!success) {
+      setShowConnectModal(true);
+    }
+  };
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -128,7 +137,7 @@ export function TopBar({
               </button>
             ) : (
               <button
-                onClick={connect}
+                onClick={handleConnectClick}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyan text-obsidian text-xs font-semibold hover:bg-cyan-dim transition-colors"
               >
                 <Wallet className="h-3.5 w-3.5" />
@@ -188,6 +197,16 @@ export function TopBar({
           );
         })}
       </nav>
+
+      {/* Wallet Connection Modal */}
+      <ConnectModal
+        isOpen={showConnectModal}
+        onClose={() => setShowConnectModal(false)}
+        onContinueSimulated={() => {
+          connectSimulated();
+          setShowConnectModal(false);
+        }}
+      />
     </header>
   );
 }
