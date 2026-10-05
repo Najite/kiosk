@@ -155,47 +155,16 @@ export function KioskManager() {
           </div>
         </Panel>
 
-        <Modal isOpen={initModalOpen} onClose={() => setInitModalOpen(false)} title="Initialize New Soroban Kiosk">
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              const form = e.target as HTMLFormElement;
-              const name = (form.elements.namedItem('name') as HTMLInputElement).value;
-              const desc = (form.elements.namedItem('description') as HTMLInputElement).value;
-              const token = (form.elements.namedItem('token') as HTMLSelectElement).value;
-              initializeKiosk(name, desc, token);
-            }}
-            className="space-y-4"
-          >
-            <div>
-              <Label>Kiosk Name</Label>
-              <Input name="name" defaultValue="My Stellar Kiosk" required />
-            </div>
-            <div>
-              <Label>Description</Label>
-              <Input name="description" defaultValue="Decentralized escrow kiosk for digital assets." />
-            </div>
-            <div>
-              <Label>Settlement Asset</Label>
-              <select
-                name="token"
-                defaultValue="XLM"
-                className="w-full px-3 py-2 text-xs rounded-lg bg-surface border border-white/10 text-gray-200 focus:outline-none focus:border-cyan/50 font-mono"
-              >
-                <option value="XLM">Native XLM (Stellar Lumens)</option>
-                <option value="USDC">USDC (Stellar Fiat Token)</option>
-              </select>
-            </div>
-            <div className="pt-2 flex justify-end gap-2">
-              <Button type="button" variant="secondary" size="sm" onClick={() => setInitModalOpen(false)}>
-                Cancel
-              </Button>
-              <Button type="submit" size="sm">
-                Deploy & Register Kiosk
-              </Button>
-            </div>
-          </form>
-        </Modal>
+        <InitializeKioskModal
+          open={initModalOpen}
+          onClose={() => setInitModalOpen(false)}
+          onInit={initializeKiosk}
+          defaults={{
+            name: 'My Stellar Kiosk',
+            description: 'Decentralized escrow kiosk for digital assets.',
+            token: 'XLM',
+          }}
+        />
       </div>
     );
   }
