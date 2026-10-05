@@ -1,7 +1,5 @@
 # StellarKiosk
 
-[![Open in Bolt](https://bolt.new/static/open-in-bolt.svg)](https://bolt.new/~/sb1-dqnzgluw)
-
 > Composable Escrow & Digital Asset Protocol on the Stellar Network and Soroban smart contract ecosystem.
 
 StellarKiosk ports Sui's flagship **Kiosk** architecture to Stellar/Soroban — providing open-source maintainers and dApp developers with composable on-chain escrows, programmable transfer policies (royalties, dependency revenue splits, time-locks), and an embeddable web widget for seamless web2/web3 commerce.
