@@ -155,7 +155,7 @@ export function KioskManager() {
           </div>
         </Panel>
 
-        <InitializeKioskModal
+        <InitModal
           open={initModalOpen}
           onClose={() => setInitModalOpen(false)}
           onInit={initializeKiosk}
