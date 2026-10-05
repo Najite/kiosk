@@ -1,7 +1,8 @@
 {
-  "name": "vite-react-typescript-starter",
+  "name": "stellarkiosk-dashboard",
+  "description": "Non-custodial kiosk and transfer policy engine on Stellar & Soroban",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -11,6 +12,8 @@
     "typecheck": "tsc --noEmit -p tsconfig.app.json"
   },
   "dependencies": {
+    "@stellar/freighter-api": "^6.0.1",
+    "@stellar/stellar-sdk": "^17.2.1",
     "@supabase/supabase-js": "^2.57.4",
     "lucide-react": "^0.446.0",
     "react": "^18.3.1",

@@ -32,7 +32,7 @@ export function TopBar({
   onViewChange: (v: ViewId) => void;
   onExit: () => void;
 }) {
-  const { address, isConnected, connect, disconnect, network, setNetwork, shortAddr } = useWallet();
+  const { address, isConnected, connect, disconnect, network, setNetwork, shortAddr, isSimulated } = useWallet();
   const [walletOpen, setWalletOpen] = useState(false);
   const [netOpen, setNetOpen] = useState(false);
   const walletRef = useRef<HTMLDivElement>(null);
@@ -136,11 +136,22 @@ export function TopBar({
               </button>
             )}
             {walletOpen && isConnected && (
-              <div className="absolute right-0 mt-1.5 w-64 panel p-3 animate-slide-up z-50">
-                <p className="text-[10px] uppercase tracking-wider text-gray-500 mb-1">Connected Address</p>
-                <p className="mono text-xs text-cyan break-all leading-relaxed">{address}</p>
+              <div className="absolute right-0 mt-1.5 w-72 panel p-3 animate-slide-up z-50">
+                <div className="flex items-center justify-between mb-1.5">
+                  <p className="text-[10px] uppercase tracking-wider text-gray-500">Connected Address</p>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded font-mono ${
+                    isSimulated 
+                      ? 'bg-amber/10 text-amber border border-amber/20' 
+                      : 'bg-emerald/10 text-emerald border border-emerald/20'
+                  }`}>
+                    {isSimulated ? 'Simulated' : 'Freighter'}
+                  </span>
+                </div>
+                <p className="mono text-xs text-cyan break-all leading-relaxed bg-black/40 p-2 rounded border border-white/5">{address}</p>
                 <div className="mt-3 pt-3 border-t border-white/10 flex items-center justify-between">
-                  <span className="text-xs text-gray-500">Simulated Freighter session</span>
+                  <span className="text-[11px] text-gray-400">
+                    {isSimulated ? 'Demo session' : 'Live Freighter wallet'}
+                  </span>
                   <button
                     onClick={() => {
                       disconnect();
