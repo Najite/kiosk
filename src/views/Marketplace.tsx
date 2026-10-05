@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Store,
   ShoppingCart,
@@ -39,6 +39,7 @@ export function Marketplace() {
   const [selectedItem, setSelectedItem] = useState<KioskItem | null>(null);
   const [checkoutStep, setCheckoutStep] = useState<CheckoutStep>('idle');
   const [completedTx, setCompletedTx] = useState<EscrowTransaction | null>(null);
+  const isPurchasingRef = useRef(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -78,39 +79,45 @@ export function Marketplace() {
   };
 
   const executePurchase = async () => {
-    if (!selectedItem || !kiosk || !payout || !policy) return;
-    setCheckoutStep('signing');
-    await new Promise((r) => setTimeout(r, 1200));
+    if (!selectedItem || !kiosk || !payout || !policy || isPurchasingRef.current) return;
+    isPurchasingRef.current = true;
+    try {
+      setCheckoutStep('signing');
+      await new Promise((r) => setTimeout(r, 1200));
 
-    setCheckoutStep('settling');
-    await new Promise((r) => setTimeout(r, 1000));
+      setCheckoutStep('settling');
+      await new Promise((r) => setTimeout(r, 1000));
 
-    const buyer = address || generateStellarAddress();
-    const txHash = generateTxHash();
-    const newTx: Omit<EscrowTransaction, 'id' | 'created_at'> = {
-      kiosk_id: kiosk.id,
-      item_id: selectedItem.id,
-      buyer_address: buyer,
-      seller_address: kiosk.owner_address,
-      amount: selectedItem.price,
-      seller_payout: payout.sellerPayout,
-      royalty_payout: payout.royaltyPayout,
-      upstream_payout: payout.upstreamPayout,
-      tx_hash: txHash,
-      ledger_timestamp: new Date().toISOString(),
-      status: policy.escrow_mode === 'INSTANT' ? 'SETTLED' : 'PENDING',
-    };
+      const buyer = address || generateStellarAddress();
+      const txHash = generateTxHash();
+      const newTx: Omit<EscrowTransaction, 'id' | 'created_at'> = {
+        kiosk_id: kiosk.id,
+        item_id: selectedItem.id,
+        buyer_address: buyer,
+        seller_address: kiosk.owner_address,
+        amount: selectedItem.price,
+        seller_payout: payout.sellerPayout,
+        royalty_payout: payout.royaltyPayout,
+        upstream_payout: payout.upstreamPayout,
+        tx_hash: txHash,
+        ledger_timestamp: new Date().toISOString(),
+        status: policy.escrow_mode === 'INSTANT' ? 'SETTLED' : 'PENDING',
+      };
 
-    const tx = await kioskStorage.recordTransaction(newTx, address, isSimulated);
-    setCompletedTx(tx);
-    setTransactions([tx, ...transactions]);
-    await kioskStorage.updateKiosk({
-      total_sales_volume: Number(kiosk.total_sales_volume) + selectedItem.price,
-    }, address, isSimulated);
-    setCheckoutStep('done');
+      const tx = await kioskStorage.recordTransaction(newTx, address, isSimulated);
+      setCompletedTx(tx);
+      setTransactions((prev) => [tx, ...prev]);
+      await kioskStorage.updateKiosk({
+        total_sales_volume: Number(kiosk.total_sales_volume) + selectedItem.price,
+      }, address, isSimulated);
+      setCheckoutStep('done');
+    } finally {
+      isPurchasingRef.current = false;
+    }
   };
 
   const closeCheckout = () => {
+    isPurchasingRef.current = false;
     setCheckoutStep('idle');
     setSelectedItem(null);
     setCompletedTx(null);

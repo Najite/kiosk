@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from 'react';
 import {
   isConnected as freighterIsConnected,
   isAllowed as freighterIsAllowed,
@@ -48,6 +48,9 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const [accountExists, setAccountExists] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Sequence tracker to prevent race conditions during rapid network switching
+  const querySeqRef = useRef<number>(0);
+
   // Helper to query live account status from Horizon RPC
   const refreshAccount = useCallback(async () => {
     if (!address) {
@@ -55,9 +58,12 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       setAccountExists(false);
       return;
     }
+    const currentSeq = ++querySeqRef.current;
     const info = await fetchLiveAccount(address, network);
-    setAccountExists(info.exists);
-    setXlmBalance(info.xlmBalance);
+    if (currentSeq === querySeqRef.current) {
+      setAccountExists(info.exists);
+      setXlmBalance(info.xlmBalance);
+    }
   }, [address, network]);
 
   useEffect(() => {
@@ -177,9 +183,12 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const setNetwork = async (n: Network) => {
     setNetworkState(n);
     if (address) {
+      const currentSeq = ++querySeqRef.current;
       const info = await fetchLiveAccount(address, n);
-      setAccountExists(info.exists);
-      setXlmBalance(info.xlmBalance);
+      if (currentSeq === querySeqRef.current) {
+        setAccountExists(info.exists);
+        setXlmBalance(info.xlmBalance);
+      }
     }
   };
 

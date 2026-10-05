@@ -27,17 +27,41 @@ export function getHorizonServer(network: StellarNetwork): Horizon.Server {
 
 export async function fetchLiveAccount(address: string, network: StellarNetwork) {
   try {
-    const server = getHorizonServer(network);
-    const account = await server.loadAccount(address);
-    const xlmBalance = account.balances.find((b) => b.asset_type === 'native')?.balance || '0';
+    const horizonUrl = STELLAR_CONFIG[network].horizonUrl;
+    // Perform standard fetch first to gracefully check status without triggering unhandled SDK exceptions
+    const response = await fetch(`${horizonUrl}/accounts/${encodeURIComponent(address)}`);
+    
+    if (response.status === 404) {
+      // Account exists as a valid Stellar public key, but has not yet received base reserve on this network
+      return {
+        exists: false,
+        sequence: '0',
+        xlmBalance: '0',
+        balances: [],
+      };
+    }
+
+    if (!response.ok) {
+      return {
+        exists: false,
+        sequence: '0',
+        xlmBalance: '0',
+        balances: [],
+      };
+    }
+
+    const data = await response.json();
+    const balances = Array.isArray(data.balances) ? data.balances : [];
+    const nativeBal = balances.find((b: { asset_type?: string }) => b.asset_type === 'native');
+    const xlmBalance = nativeBal?.balance || '0';
+
     return {
       exists: true,
-      sequence: account.sequence,
+      sequence: data.sequence || '0',
       xlmBalance,
-      balances: account.balances,
+      balances,
     };
-  } catch (err: unknown) {
-    // 404 means unfunded/new account on this network
+  } catch {
     return {
       exists: false,
       sequence: '0',
