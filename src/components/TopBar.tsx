@@ -53,6 +53,18 @@ export function TopBar({
   } = useWallet();
   const [walletOpen, setWalletOpen] = useState(false);
   const [netOpen, setNetOpen] = useState(false);
+  const [networkToast, setNetworkToast] = useState<string | null>(null);
+
+  const handleNetworkSelect = async (n: 'TESTNET' | 'MAINNET') => {
+    setNetOpen(false);
+    if (n === network) return;
+    setNetworkToast(`Switching to Stellar ${n}...`);
+    await setNetwork(n);
+    setTimeout(() => {
+      setNetworkToast(`Connected to Stellar ${n}`);
+      setTimeout(() => setNetworkToast(null), 2500);
+    }, 400);
+  };
   const [funding, setFunding] = useState(false);
   const [showConnectModal, setShowConnectModal] = useState(false);
   const walletRef = useRef<HTMLDivElement>(null);
@@ -67,11 +79,15 @@ export function TopBar({
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (walletRef.current && !walletRef.current.contains(e.target as Node)) setWalletOpen(false);
-      if (netRef.current && !netRef.current.contains(e.target as Node)) setNetOpen(false);
+      if (walletRef.current && !walletRef.current.contains(e.target as Node)) {
+        setWalletOpen(false);
+      }
+      if (netRef.current && !netRef.current.contains(e.target as Node)) {
+        setNetOpen(false);
+      }
     };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
+    document.addEventListener('click', handler);
+    return () => document.removeEventListener('click', handler);
   }, []);
 
   return (
@@ -122,20 +138,24 @@ export function TopBar({
               <ChevronDown className="h-3 w-3 text-gray-500" />
             </button>
             {netOpen && (
-              <div className="absolute right-0 mt-1.5 w-40 panel p-1 animate-slide-up z-50">
+              <div className="absolute right-0 mt-1.5 w-44 panel p-1 animate-slide-up z-50 shadow-2xl">
                 {(['TESTNET', 'MAINNET'] as const).map((n) => (
                   <button
                     key={n}
-                    onClick={() => {
-                      setNetwork(n);
-                      setNetOpen(false);
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleNetworkSelect(n);
                     }}
-                    className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md text-xs transition-colors ${
-                      network === n ? 'bg-white/10 text-white' : 'text-gray-400 hover:bg-white/5'
+                    className={`w-full flex items-center justify-between px-2.5 py-2 rounded-md text-xs transition-colors ${
+                      network === n ? 'bg-white/10 text-white font-medium' : 'text-gray-400 hover:bg-white/5 hover:text-white'
                     }`}
                   >
-                    <span className={`h-1.5 w-1.5 rounded-full ${n === 'TESTNET' ? 'bg-amber' : 'bg-emerald'}`} />
-                    {n}
+                    <div className="flex items-center gap-2">
+                      <span className={`h-2 w-2 rounded-full ${n === 'TESTNET' ? 'bg-amber' : 'bg-emerald'}`} />
+                      <span>{n}</span>
+                    </div>
+                    {network === n && <span className="text-[10px] text-cyan font-mono">Active</span>}
                   </button>
                 ))}
               </div>
@@ -265,6 +285,14 @@ export function TopBar({
           );
         })}
       </nav>
+
+      {/* Network Switch Toast Notification */}
+      {networkToast && (
+        <div className="fixed bottom-5 right-5 z-50 animate-slide-up flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-obsidian-light border border-cyan/30 shadow-2xl text-xs text-white">
+          <span className={`h-2 w-2 rounded-full ${network === 'TESTNET' ? 'bg-amber' : 'bg-emerald'} animate-pulse`} />
+          <span className="font-medium">{networkToast}</span>
+        </div>
+      )}
 
       {/* Wallet Connection Modal */}
       <ConnectModal

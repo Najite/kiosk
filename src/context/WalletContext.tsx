@@ -84,6 +84,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let watcher: WatchWalletChanges | null = null;
     let isMounted = true;
+    let lastKnownPassphrase = '';
 
     const setupFreighterWatcher = async () => {
       try {
@@ -91,14 +92,15 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         if (isMounted) setIsFreighterInstalled(!!res?.isConnected);
 
         if (res?.isConnected) {
-          watcher = new WatchWalletChanges(1000);
+          watcher = new WatchWalletChanges(1500);
           watcher.watch((params) => {
             if (!isMounted) return;
             if (params.address) {
               setAddress(params.address);
               setIsSimulated(false);
             }
-            if (params.networkPassphrase) {
+            if (params.networkPassphrase && params.networkPassphrase !== lastKnownPassphrase) {
+              lastKnownPassphrase = params.networkPassphrase;
               if (params.networkPassphrase === STELLAR_CONFIG.MAINNET.passphrase) {
                 setNetworkState('MAINNET');
               } else {
