@@ -12,10 +12,12 @@ import {
   ScrollText,
 } from 'lucide-react';
 import { kioskStorage, type Kiosk, type KioskItem, type TransferPolicy, type UpstreamRecipient } from '@/lib/kiosk';
-import { bpsToPercent, formatTokenAmount, formatDuration, calculatePayouts } from '@/lib/stellar';
+import { useWallet } from '@/context/WalletContext';
+import { bpsToPercent, formatTokenAmount, formatDuration, calculatePayouts, shortAddress } from '@/lib/stellar';
 import { Panel, SectionTitle, Badge, Button, Input, Label, EmptyState, StatCard } from '@/components/ui';
 
 export function PolicyEngine() {
+  const { address, isConnected, isSimulated, connect } = useWallet();
   const [kiosk, setKiosk] = useState<Kiosk | null>(null);
   const [items, setItems] = useState<KioskItem[]>([]);
   const [policies, setPolicies] = useState<Record<string, TransferPolicy>>({});
@@ -28,20 +30,25 @@ export function PolicyEngine() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const kData = await kioskStorage.getKiosk();
+    const kData = await kioskStorage.getKiosk(address, isSimulated);
     if (kData) {
       setKiosk(kData);
-      const itemsList = await kioskStorage.getItems(kData.id);
+      const itemsList = await kioskStorage.getItems(kData.id, address, isSimulated);
       setItems(itemsList);
 
-      const policyMap = await kioskStorage.getPolicies();
+      const policyMap = await kioskStorage.getPolicies(address, isSimulated);
       setPolicies(policyMap);
       if (itemsList.length > 0 && !selectedItemId) {
         setSelectedItemId(itemsList[0].id);
       }
+    } else {
+      setKiosk(null);
+      setItems([]);
+      setPolicies({});
+      setSelectedItemId(null);
     }
     setLoading(false);
-  }, [selectedItemId]);
+  }, [selectedItemId, address, isSimulated]);
 
   useEffect(() => {
     load();
@@ -105,7 +112,7 @@ export function PolicyEngine() {
       timelock_seconds: draft.timelock_seconds,
       escrow_mode: draft.escrow_mode,
     };
-    const updated = await kioskStorage.savePolicy(payload);
+    const updated = await kioskStorage.savePolicy(payload, address, isSimulated);
     setPolicies({ ...policies, [selectedItemId]: updated });
     setDraft(updated);
     setSaving(false);
@@ -124,13 +131,26 @@ export function PolicyEngine() {
     );
   }
 
+  const isLive = isConnected && !isSimulated;
+
   if (items.length === 0) {
     return (
-      <EmptyState
-        icon={<Shield className="h-6 w-6" />}
-        title="No items to configure"
-        description="Add assets in the Kiosk Manager first, then configure their transfer policies here."
-      />
+      <div className="space-y-4">
+        {isLive && (
+          <div className="p-3.5 rounded-xl bg-emerald/5 border border-emerald/20 flex items-center justify-between text-xs text-gray-300">
+            <div className="flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full bg-emerald animate-pulse" />
+              <span>Live Wallet Connected: <strong className="font-mono text-white">{shortAddress(address || '')}</strong></span>
+            </div>
+            <span className="text-[11px] font-mono text-emerald bg-emerald/10 px-2 py-0.5 rounded border border-emerald/20">Live Policy Registry</span>
+          </div>
+        )}
+        <EmptyState
+          icon={<Shield className="h-6 w-6" />}
+          title="No assets to configure"
+          description="Add or list an asset in the Kiosk Manager first, then define custom royalties, splits, and timelocks here."
+        />
+      </div>
     );
   }
 
@@ -141,6 +161,26 @@ export function PolicyEngine() {
 
   return (
     <div className="space-y-5 animate-fade-in">
+      {/* Mode Banner */}
+      {!isLive ? (
+        <div className="p-3 rounded-xl bg-amber/5 border border-amber/20 flex flex-wrap items-center justify-between gap-2 text-xs">
+          <div className="flex items-center gap-2 text-amber-200">
+            <span className="h-2 w-2 rounded-full bg-amber animate-pulse" />
+            <span><strong>Sandbox Demo Mode:</strong> Reviewing protocol royalty and timelock engine test rules.</span>
+          </div>
+          <button onClick={() => connect()} className="text-[11px] font-semibold text-amber hover:underline">
+            Connect Live Wallet &rarr;
+          </button>
+        </div>
+      ) : (
+        <div className="p-3 rounded-xl bg-emerald/5 border border-emerald/20 flex items-center justify-between text-xs text-emerald-200">
+          <div className="flex items-center gap-2">
+            <span className="h-2 w-2 rounded-full bg-emerald animate-pulse" />
+            <span><strong>Live Account Mode:</strong> Active Policy Engine for <code className="font-mono text-white">{shortAddress(address || '')}</code></span>
+          </div>
+          <span className="text-[10px] font-mono text-emerald bg-emerald/10 px-2 py-0.5 rounded border border-emerald/20">On-Chain Mode</span>
+        </div>
+      )}
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <StatCard label="Items with Policy" value={String(Object.keys(policies).length)} icon={<Shield className="h-4 w-4" />} accent="cyan" />

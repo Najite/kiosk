@@ -35,7 +35,7 @@ import {
 } from '@/components/ui';
 
 export function KioskManager() {
-  const { address, isConnected, connect } = useWallet();
+  const { address, isConnected, isSimulated, connect } = useWallet();
   const [kiosk, setKiosk] = useState<Kiosk | null>(null);
   const [items, setItems] = useState<KioskItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -52,14 +52,17 @@ export function KioskManager() {
 
   const loadKiosk = useCallback(async () => {
     setLoading(true);
-    const kData = await kioskStorage.getKiosk();
+    const kData = await kioskStorage.getKiosk(address, isSimulated);
     if (kData) {
       setKiosk(kData);
-      const iData = await kioskStorage.getItems(kData.id);
+      const iData = await kioskStorage.getItems(kData.id, address, isSimulated);
       setItems(iData);
+    } else {
+      setKiosk(null);
+      setItems([]);
     }
     setLoading(false);
-  }, []);
+  }, [address, isSimulated]);
 
   useEffect(() => {
     loadKiosk();
@@ -75,7 +78,7 @@ export function KioskManager() {
       is_initialized: true,
       owner_address: owner,
       contract_id: contractId,
-    });
+    }, address, isSimulated);
     setKiosk(updated);
     setInitModalOpen(false);
   };
@@ -90,14 +93,14 @@ export function KioskManager() {
       price: parseFloat(newItem.price) || 0,
       icon: newItem.icon,
       status: 'AVAILABLE',
-    });
+    }, address, isSimulated);
     setItems([created, ...items]);
     setNewItem({ title: '', description: '', asset_type: 'License', price: '0', icon: 'Package' });
     setAddItemOpen(false);
   };
 
   const deleteItem = async (id: string) => {
-    await kioskStorage.deleteItem(id);
+    await kioskStorage.deleteItem(id, address, isSimulated);
     setItems(items.filter((i) => i.id !== id));
   };
 
@@ -120,13 +123,80 @@ export function KioskManager() {
     );
   }
 
+  const isLive = isConnected && !isSimulated;
+
   if (!kiosk) {
     return (
-      <EmptyState
-        icon={<Boxes className="h-6 w-6" />}
-        title="No Kiosk Found"
-        description="Initialize your first Soroban Kiosk to get started."
-      />
+      <div className="space-y-4 animate-fade-in">
+        {isLive && (
+          <div className="p-3.5 rounded-xl bg-emerald/5 border border-emerald/20 flex items-center justify-between text-xs text-gray-300">
+            <div className="flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full bg-emerald animate-pulse" />
+              <span>Live Freighter Wallet Connected: <strong className="font-mono text-white">{shortAddress(address || '')}</strong></span>
+            </div>
+            <span className="text-[11px] font-mono text-emerald bg-emerald/10 px-2 py-0.5 rounded border border-emerald/20">Live Account Mode</span>
+          </div>
+        )}
+        <Panel className="p-8 text-center space-y-4">
+          <div className="inline-flex p-3 rounded-2xl bg-cyan/10 border border-cyan/20 text-cyan">
+            <Boxes className="h-8 w-8" />
+          </div>
+          <div>
+            <h3 className="text-base font-semibold text-white">No Kiosk Initialized For This Account</h3>
+            <p className="text-xs text-gray-400 mt-1 max-w-md mx-auto">
+              Your connected Stellar address does not have a registered Soroban Kiosk instance yet. Initialize a new escrow contract to deploy assets.
+            </p>
+          </div>
+          <div className="pt-2">
+            <Button size="sm" onClick={() => setInitModalOpen(true)}>
+              <Settings2 className="h-3.5 w-3.5" />
+              Initialize Soroban Kiosk
+            </Button>
+          </div>
+        </Panel>
+
+        <Modal isOpen={initModalOpen} onClose={() => setInitModalOpen(false)} title="Initialize New Soroban Kiosk">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              const form = e.target as HTMLFormElement;
+              const name = (form.elements.namedItem('name') as HTMLInputElement).value;
+              const desc = (form.elements.namedItem('description') as HTMLInputElement).value;
+              const token = (form.elements.namedItem('token') as HTMLSelectElement).value;
+              initializeKiosk(name, desc, token);
+            }}
+            className="space-y-4"
+          >
+            <div>
+              <Label>Kiosk Name</Label>
+              <Input name="name" defaultValue="My Stellar Kiosk" required />
+            </div>
+            <div>
+              <Label>Description</Label>
+              <Input name="description" defaultValue="Decentralized escrow kiosk for digital assets." />
+            </div>
+            <div>
+              <Label>Settlement Asset</Label>
+              <select
+                name="token"
+                defaultValue="XLM"
+                className="w-full px-3 py-2 text-xs rounded-lg bg-surface border border-white/10 text-gray-200 focus:outline-none focus:border-cyan/50 font-mono"
+              >
+                <option value="XLM">Native XLM (Stellar Lumens)</option>
+                <option value="USDC">USDC (Stellar Fiat Token)</option>
+              </select>
+            </div>
+            <div className="pt-2 flex justify-end gap-2">
+              <Button type="button" variant="secondary" size="sm" onClick={() => setInitModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" size="sm">
+                Deploy & Register Kiosk
+              </Button>
+            </div>
+          </form>
+        </Modal>
+      </div>
     );
   }
 
@@ -136,6 +206,29 @@ export function KioskManager() {
 
   return (
     <div className="space-y-5 animate-fade-in">
+      {/* Mode Banner */}
+      {!isLive ? (
+        <div className="p-3 rounded-xl bg-amber/5 border border-amber/20 flex flex-wrap items-center justify-between gap-2 text-xs">
+          <div className="flex items-center gap-2 text-amber-200">
+            <span className="h-2 w-2 rounded-full bg-amber animate-pulse" />
+            <span><strong>Sandbox Demo Mode:</strong> Viewing pre-populated protocol preview. Connect your live Freighter wallet above to manage your personal on-chain kiosk.</span>
+          </div>
+          <button
+            onClick={() => connect()}
+            className="text-[11px] font-semibold text-amber hover:underline shrink-0"
+          >
+            Connect Freighter &rarr;
+          </button>
+        </div>
+      ) : (
+        <div className="p-3 rounded-xl bg-emerald/5 border border-emerald/20 flex items-center justify-between text-xs text-emerald-200">
+          <div className="flex items-center gap-2">
+            <span className="h-2 w-2 rounded-full bg-emerald animate-pulse" />
+            <span><strong>Live Account Mode:</strong> Connected to live wallet <code className="text-white font-mono">{shortAddress(address || '')}</code></span>
+          </div>
+          <span className="text-[10px] font-mono uppercase bg-emerald/10 border border-emerald/20 px-2 py-0.5 rounded text-emerald">Decentralized</span>
+        </div>
+      )}
       {/* Stats Row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <StatCard

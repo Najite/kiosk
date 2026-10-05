@@ -12,10 +12,12 @@ import {
   Monitor,
 } from 'lucide-react';
 import { kioskStorage, type Kiosk, type KioskItem, type WidgetConfig } from '@/lib/kiosk';
-import { formatTokenAmount } from '@/lib/stellar';
+import { useWallet } from '@/context/WalletContext';
+import { formatTokenAmount, shortAddress } from '@/lib/stellar';
 import { Panel, SectionTitle, Badge, Button, Input, Label, Toggle } from '@/components/ui';
 
 export function WidgetCustomizer() {
+  const { address, isConnected, isSimulated, connect } = useWallet();
   const [kiosk, setKiosk] = useState<Kiosk | null>(null);
   const [items, setItems] = useState<KioskItem[]>([]);
   const [config, setConfig] = useState<WidgetConfig | null>(null);
@@ -27,18 +29,24 @@ export function WidgetCustomizer() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const kData = await kioskStorage.getKiosk();
+    const kData = await kioskStorage.getKiosk(address, isSimulated);
     if (kData) {
       setKiosk(kData);
-      const itemsList = await kioskStorage.getItems(kData.id);
+      const itemsList = await kioskStorage.getItems(kData.id, address, isSimulated);
       setItems(itemsList);
       if (itemsList.length > 0) setPreviewItem(itemsList[0]);
 
-      const wData = await kioskStorage.getWidgetConfig(kData.id);
+      const wData = await kioskStorage.getWidgetConfig(kData.id, address, isSimulated);
+      setConfig(wData);
+    } else {
+      setKiosk(null);
+      setItems([]);
+      setPreviewItem(null);
+      const wData = await kioskStorage.getWidgetConfig('', address, isSimulated);
       setConfig(wData);
     }
     setLoading(false);
-  }, []);
+  }, [address, isSimulated]);
 
   useEffect(() => {
     load();
@@ -46,7 +54,7 @@ export function WidgetCustomizer() {
 
   const updateConfig = async (patch: Partial<WidgetConfig>) => {
     if (!config) return;
-    const updated = await kioskStorage.updateWidgetConfig({ ...patch, kiosk_id: kiosk?.id });
+    const updated = await kioskStorage.updateWidgetConfig({ ...patch, kiosk_id: kiosk?.id }, address, isSimulated);
     setConfig(updated);
   };
 
@@ -113,8 +121,31 @@ export default function DocsPage() {
     );
   }
 
+  const isLive = isConnected && !isSimulated;
+
   return (
     <div className="space-y-5 animate-fade-in">
+      {/* Mode Banner */}
+      {!isLive ? (
+        <div className="p-3 rounded-xl bg-amber/5 border border-amber/20 flex flex-wrap items-center justify-between gap-2 text-xs">
+          <div className="flex items-center gap-2 text-amber-200">
+            <span className="h-2 w-2 rounded-full bg-amber animate-pulse" />
+            <span><strong>Sandbox Demo Mode:</strong> Generating embeddable widgets with preview contract parameters.</span>
+          </div>
+          <button onClick={() => connect()} className="text-[11px] font-semibold text-amber hover:underline">
+            Connect Live Wallet &rarr;
+          </button>
+        </div>
+      ) : (
+        <div className="p-3 rounded-xl bg-emerald/5 border border-emerald/20 flex items-center justify-between text-xs text-emerald-200">
+          <div className="flex items-center gap-2">
+            <span className="h-2 w-2 rounded-full bg-emerald animate-pulse" />
+            <span><strong>Live Account Mode:</strong> Generating embed codes for <code className="font-mono text-white">{shortAddress(address || '')}</code></span>
+          </div>
+          <span className="text-[10px] font-mono text-emerald bg-emerald/10 px-2 py-0.5 rounded border border-emerald/20">Production Ready</span>
+        </div>
+      )}
+
       <div className="grid lg:grid-cols-[1fr_400px] gap-5">
         {/* Left: Customizer */}
         <div className="space-y-5">

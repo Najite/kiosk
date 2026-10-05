@@ -30,7 +30,7 @@ import { Panel, SectionTitle, Badge, Button, Modal, StatusDot, StatCard, EmptySt
 type CheckoutStep = 'idle' | 'review' | 'signing' | 'settling' | 'done';
 
 export function Marketplace() {
-  const { address, isConnected, connect, shortAddr } = useWallet();
+  const { address, isConnected, isSimulated, connect, shortAddr } = useWallet();
   const [kiosk, setKiosk] = useState<Kiosk | null>(null);
   const [items, setItems] = useState<KioskItem[]>([]);
   const [policies, setPolicies] = useState<Record<string, TransferPolicy>>({});
@@ -42,20 +42,25 @@ export function Marketplace() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const kData = await kioskStorage.getKiosk();
+    const kData = await kioskStorage.getKiosk(address, isSimulated);
     if (kData) {
       setKiosk(kData);
-      const iData = await kioskStorage.getItems(kData.id);
+      const iData = await kioskStorage.getItems(kData.id, address, isSimulated);
       setItems(iData);
 
-      const pm = await kioskStorage.getPolicies();
+      const pm = await kioskStorage.getPolicies(address, isSimulated);
       setPolicies(pm);
 
-      const tData = await kioskStorage.getTransactions(kData.id);
+      const tData = await kioskStorage.getTransactions(kData.id, address, isSimulated);
       setTransactions(tData);
+    } else {
+      setKiosk(null);
+      setItems([]);
+      setPolicies({});
+      setTransactions([]);
     }
     setLoading(false);
-  }, []);
+  }, [address, isSimulated]);
 
   useEffect(() => {
     load();
@@ -96,12 +101,12 @@ export function Marketplace() {
       status: policy.escrow_mode === 'INSTANT' ? 'SETTLED' : 'PENDING',
     };
 
-    const tx = await kioskStorage.recordTransaction(newTx);
+    const tx = await kioskStorage.recordTransaction(newTx, address, isSimulated);
     setCompletedTx(tx);
     setTransactions([tx, ...transactions]);
     await kioskStorage.updateKiosk({
       total_sales_volume: Number(kiosk.total_sales_volume) + selectedItem.price,
-    });
+    }, address, isSimulated);
     setCheckoutStep('done');
   };
 
@@ -122,11 +127,33 @@ export function Marketplace() {
     );
   }
 
+  const isLive = isConnected && !isSimulated;
   const totalVolume = transactions.reduce((a, t) => a + Number(t.amount), 0);
   const settledCount = transactions.filter((t) => t.status === 'SETTLED').length;
 
   return (
     <div className="space-y-5 animate-fade-in">
+      {/* Mode Banner */}
+      {!isLive ? (
+        <div className="p-3 rounded-xl bg-amber/5 border border-amber/20 flex flex-wrap items-center justify-between gap-2 text-xs">
+          <div className="flex items-center gap-2 text-amber-200">
+            <span className="h-2 w-2 rounded-full bg-amber animate-pulse" />
+            <span><strong>Sandbox Demo Mode:</strong> Reviewing simulated marketplace listings and test purchases.</span>
+          </div>
+          <button onClick={() => connect()} className="text-[11px] font-semibold text-amber hover:underline">
+            Connect Live Wallet &rarr;
+          </button>
+        </div>
+      ) : (
+        <div className="p-3 rounded-xl bg-emerald/5 border border-emerald/20 flex items-center justify-between text-xs text-emerald-200">
+          <div className="flex items-center gap-2">
+            <span className="h-2 w-2 rounded-full bg-emerald animate-pulse" />
+            <span><strong>Live Account Mode:</strong> Connected as <code className="font-mono text-white">{shortAddress(address || '')}</code></span>
+          </div>
+          <span className="text-[10px] font-mono text-emerald bg-emerald/10 px-2 py-0.5 rounded border border-emerald/20">Active Session</span>
+        </div>
+      )}
+
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <StatCard label="Listed Items" value={String(items.length)} icon={<Store className="h-4 w-4" />} accent="cyan" />
@@ -139,7 +166,7 @@ export function Marketplace() {
       <Panel className="p-5">
         <SectionTitle title="Live Marketplace" subtitle="Browse and purchase assets via Soroban escrow" icon={<Store className="h-4 w-4" />} />
         {items.length === 0 ? (
-          <EmptyState icon={<Store className="h-6 w-6" />} title="No items listed" description="Items added in the Kiosk Manager will appear here for purchase." />
+          <EmptyState icon={<Store className="h-6 w-6" />} title="No items listed yet" description="Items added in the Kiosk Manager will appear here for purchase." />
         ) : (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {items.map((item) => {

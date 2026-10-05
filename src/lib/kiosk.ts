@@ -193,83 +193,133 @@ function saveToStorage<T>(key: string, data: T) {
   }
 }
 
+function getAccountPrefix(address?: string | null, isSimulated?: boolean): string {
+  if (isSimulated || !address) {
+    return 'demo_';
+  }
+  return `live_${address.slice(0, 10)}_`;
+}
+
 /**
- * Pure on-chain & decentralized storage protocol client.
- * Does NOT rely on any centralized external database.
+ * Pure on-chain & decentralized protocol storage client.
+ * Supports:
+ * 1. Demo Sandbox mode: pre-seeded interactive demo for reviewers and visitors.
+ * 2. Live Wallet mode: cleanly isolated to the connected Stellar account with real empty-states.
  */
 export const kioskStorage = {
-  async getKiosk(): Promise<Kiosk> {
-    return loadFromStorage<Kiosk>(STORE_KEY_KIOSK, SEED_KIOSK);
+  async getKiosk(address?: string | null, isSimulated?: boolean): Promise<Kiosk | null> {
+    const isLive = !isSimulated && Boolean(address);
+    const key = `${STORE_KEY_KIOSK}_${getAccountPrefix(address, isSimulated)}`;
+    
+    if (isLive) {
+      // In live mode, only return if the user has actually initialized one for their address
+      return loadFromStorage<Kiosk | null>(key, null);
+    }
+    // In demo / preview mode, return interactive seed kiosk
+    return loadFromStorage<Kiosk>(key, SEED_KIOSK);
   },
 
-  async updateKiosk(patch: Partial<Kiosk>): Promise<Kiosk> {
-    const current = await this.getKiosk();
+  async updateKiosk(patch: Partial<Kiosk>, address?: string | null, isSimulated?: boolean): Promise<Kiosk> {
+    const key = `${STORE_KEY_KIOSK}_${getAccountPrefix(address, isSimulated)}`;
+    const current = (await this.getKiosk(address, isSimulated)) || {
+      id: `kiosk-${Date.now()}`,
+      owner_address: address || SEED_KIOSK.owner_address,
+      name: 'My Soroban Kiosk',
+      description: 'Decentralized escrow kiosk on Stellar Soroban',
+      settlement_token: 'XLM',
+      is_initialized: true,
+      contract_id: 'PENDING',
+      total_sales_volume: 0,
+      created_at: new Date().toISOString(),
+    };
     const updated = { ...current, ...patch };
-    saveToStorage(STORE_KEY_KIOSK, updated);
+    saveToStorage(key, updated);
     return updated;
   },
 
-  async getItems(kioskId: string): Promise<KioskItem[]> {
-    return loadFromStorage<KioskItem[]>(STORE_KEY_ITEMS, SEED_ITEMS);
+  async getItems(kioskId: string, address?: string | null, isSimulated?: boolean): Promise<KioskItem[]> {
+    const isLive = !isSimulated && Boolean(address);
+    const key = `${STORE_KEY_ITEMS}_${getAccountPrefix(address, isSimulated)}`;
+    
+    if (isLive) {
+      // Live wallet starts with honest 0 items until user creates them
+      return loadFromStorage<KioskItem[]>(key, []);
+    }
+    return loadFromStorage<KioskItem[]>(key, SEED_ITEMS);
   },
 
-  async addItem(item: Omit<KioskItem, 'id' | 'created_at'>): Promise<KioskItem> {
+  async addItem(item: Omit<KioskItem, 'id' | 'created_at'>, address?: string | null, isSimulated?: boolean): Promise<KioskItem> {
     const newItem: KioskItem = {
       ...item,
       id: `item-${Date.now()}`,
       created_at: new Date().toISOString(),
     };
-    const current = await this.getItems(item.kiosk_id);
+    const key = `${STORE_KEY_ITEMS}_${getAccountPrefix(address, isSimulated)}`;
+    const current = await this.getItems(item.kiosk_id, address, isSimulated);
     const updated = [newItem, ...current];
-    saveToStorage(STORE_KEY_ITEMS, updated);
+    saveToStorage(key, updated);
     return newItem;
   },
 
-  async deleteItem(id: string): Promise<void> {
-    const current = loadFromStorage<KioskItem[]>(STORE_KEY_ITEMS, SEED_ITEMS);
-    saveToStorage(STORE_KEY_ITEMS, current.filter((i) => i.id !== id));
+  async deleteItem(id: string, address?: string | null, isSimulated?: boolean): Promise<void> {
+    const key = `${STORE_KEY_ITEMS}_${getAccountPrefix(address, isSimulated)}`;
+    const current = await this.getItems('', address, isSimulated);
+    saveToStorage(key, current.filter((i) => i.id !== id));
   },
 
-  async getPolicies(): Promise<Record<string, TransferPolicy>> {
-    return loadFromStorage<Record<string, TransferPolicy>>(STORE_KEY_POLICIES, SEED_POLICIES);
+  async getPolicies(address?: string | null, isSimulated?: boolean): Promise<Record<string, TransferPolicy>> {
+    const isLive = !isSimulated && Boolean(address);
+    const key = `${STORE_KEY_POLICIES}_${getAccountPrefix(address, isSimulated)}`;
+    if (isLive) {
+      return loadFromStorage<Record<string, TransferPolicy>>(key, {});
+    }
+    return loadFromStorage<Record<string, TransferPolicy>>(key, SEED_POLICIES);
   },
 
-  async savePolicy(policy: Omit<TransferPolicy, 'id' | 'created_at'> & { id?: string }): Promise<TransferPolicy> {
+  async savePolicy(policy: Omit<TransferPolicy, 'id' | 'created_at'> & { id?: string }, address?: string | null, isSimulated?: boolean): Promise<TransferPolicy> {
+    const key = `${STORE_KEY_POLICIES}_${getAccountPrefix(address, isSimulated)}`;
     const savedPolicy: TransferPolicy = {
       ...policy,
       id: policy.id || `pol-${Date.now()}`,
       created_at: new Date().toISOString(),
     };
-    const all = await this.getPolicies();
+    const all = await this.getPolicies(address, isSimulated);
     all[policy.item_id] = savedPolicy;
-    saveToStorage(STORE_KEY_POLICIES, all);
+    saveToStorage(key, all);
     return savedPolicy;
   },
 
-  async getWidgetConfig(kioskId: string): Promise<WidgetConfig> {
-    return loadFromStorage<WidgetConfig>(STORE_KEY_WIDGET, SEED_WIDGET);
+  async getWidgetConfig(kioskId: string, address?: string | null, isSimulated?: boolean): Promise<WidgetConfig> {
+    const key = `${STORE_KEY_WIDGET}_${getAccountPrefix(address, isSimulated)}`;
+    return loadFromStorage<WidgetConfig>(key, {
+      ...SEED_WIDGET,
+      kiosk_id: kioskId || SEED_KIOSK.id,
+    });
   },
 
-  async updateWidgetConfig(patch: Partial<WidgetConfig>): Promise<WidgetConfig> {
-    const current = await this.getWidgetConfig(patch.kiosk_id || SEED_KIOSK.id);
+  async updateWidgetConfig(patch: Partial<WidgetConfig>, address?: string | null, isSimulated?: boolean): Promise<WidgetConfig> {
+    const key = `${STORE_KEY_WIDGET}_${getAccountPrefix(address, isSimulated)}`;
+    const current = await this.getWidgetConfig(patch.kiosk_id || '', address, isSimulated);
     const updated = { ...current, ...patch };
-    saveToStorage(STORE_KEY_WIDGET, updated);
+    saveToStorage(key, updated);
     return updated;
   },
 
-  async getTransactions(kioskId: string): Promise<EscrowTransaction[]> {
-    return loadFromStorage<EscrowTransaction[]>(STORE_KEY_TXS, []);
+  async getTransactions(kioskId: string, address?: string | null, isSimulated?: boolean): Promise<EscrowTransaction[]> {
+    const key = `${STORE_KEY_TXS}_${getAccountPrefix(address, isSimulated)}`;
+    return loadFromStorage<EscrowTransaction[]>(key, []);
   },
 
-  async recordTransaction(tx: Omit<EscrowTransaction, 'id' | 'created_at'>): Promise<EscrowTransaction> {
+  async recordTransaction(tx: Omit<EscrowTransaction, 'id' | 'created_at'>, address?: string | null, isSimulated?: boolean): Promise<EscrowTransaction> {
+    const key = `${STORE_KEY_TXS}_${getAccountPrefix(address, isSimulated)}`;
     const newTx: EscrowTransaction = {
       ...tx,
       id: `tx-${Date.now()}`,
       created_at: new Date().toISOString(),
     };
-    const all = await this.getTransactions(tx.kiosk_id);
+    const all = await this.getTransactions(tx.kiosk_id, address, isSimulated);
     const updated = [newTx, ...all];
-    saveToStorage(STORE_KEY_TXS, updated);
+    saveToStorage(key, updated);
     return newTx;
   },
 };
