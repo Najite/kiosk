@@ -9,9 +9,11 @@ import {
   Power,
   ChevronDown,
   Zap,
+  ExternalLink,
+  RefreshCw,
 } from 'lucide-react';
 import { useWallet } from '@/context/WalletContext';
-import { shortAddress } from '@/lib/stellar';
+import { shortAddress, STELLAR_CONFIG } from '@/lib/stellar';
 import { ConnectModal } from '@/components/ConnectModal';
 
 export type ViewId = 'kiosk' | 'policy' | 'widget' | 'marketplace' | 'grant';
@@ -33,7 +35,19 @@ export function TopBar({
   onViewChange: (v: ViewId) => void;
   onExit: () => void;
 }) {
-  const { address, isConnected, connect, connectSimulated, disconnect, network, setNetwork, shortAddr, isSimulated } = useWallet();
+  const {
+    address,
+    isConnected,
+    connect,
+    connectSimulated,
+    disconnect,
+    network,
+    setNetwork,
+    shortAddr,
+    isSimulated,
+    xlmBalance,
+    refreshAccount,
+  } = useWallet();
   const [walletOpen, setWalletOpen] = useState(false);
   const [netOpen, setNetOpen] = useState(false);
   const [showConnectModal, setShowConnectModal] = useState(false);
@@ -157,6 +171,39 @@ export function TopBar({
                   </span>
                 </div>
                 <p className="mono text-xs text-cyan break-all leading-relaxed bg-black/40 p-2 rounded border border-white/5">{address}</p>
+                
+                {/* Live Balance & Network Info */}
+                <div className="mt-2.5 p-2 rounded bg-white/3 border border-white/5 flex items-center justify-between text-xs">
+                  <span className="text-gray-400">Balance:</span>
+                  <div className="flex items-center gap-1.5 font-mono">
+                    <span className="font-semibold text-white">
+                      {isSimulated ? '100.00 XLM' : xlmBalance !== null ? `${Number(xlmBalance).toLocaleString()} XLM` : 'Loading...'}
+                    </span>
+                    {!isSimulated && (
+                      <button 
+                        onClick={refreshAccount} 
+                        title="Refresh balance" 
+                        className="text-gray-400 hover:text-white transition-colors"
+                      >
+                        <RefreshCw className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* View on Stellar Expert */}
+                {!isSimulated && address && (
+                  <a
+                    href={`${STELLAR_CONFIG[network].explorerAccountUrl}${address}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-2 inline-flex items-center gap-1 text-[11px] text-gray-400 hover:text-cyan transition-colors"
+                  >
+                    <span>View on Stellar Expert ({network})</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                )}
+
                 <div className="mt-3 pt-3 border-t border-white/10 flex items-center justify-between">
                   <span className="text-[11px] text-gray-400">
                     {isSimulated ? 'Demo session' : 'Live Freighter wallet'}

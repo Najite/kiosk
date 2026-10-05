@@ -1,5 +1,53 @@
-// Stellar address + transaction simulation utilities
+import { Horizon, Networks } from '@stellar/stellar-sdk';
 
+export type StellarNetwork = 'TESTNET' | 'MAINNET';
+
+export const STELLAR_CONFIG = {
+  TESTNET: {
+    network: 'TESTNET' as StellarNetwork,
+    passphrase: Networks.TESTNET,
+    horizonUrl: 'https://horizon-testnet.stellar.org',
+    sorobanRpcUrl: 'https://soroban-testnet.stellar.org',
+    explorerTxUrl: 'https://stellar.expert/explorer/testnet/tx/',
+    explorerAccountUrl: 'https://stellar.expert/explorer/testnet/account/',
+  },
+  MAINNET: {
+    network: 'MAINNET' as StellarNetwork,
+    passphrase: Networks.PUBLIC,
+    horizonUrl: 'https://horizon.stellar.org',
+    sorobanRpcUrl: 'https://mainnet.sorobanrpc.com',
+    explorerTxUrl: 'https://stellar.expert/explorer/public/tx/',
+    explorerAccountUrl: 'https://stellar.expert/explorer/public/account/',
+  },
+} as const;
+
+export function getHorizonServer(network: StellarNetwork): Horizon.Server {
+  return new Horizon.Server(STELLAR_CONFIG[network].horizonUrl);
+}
+
+export async function fetchLiveAccount(address: string, network: StellarNetwork) {
+  try {
+    const server = getHorizonServer(network);
+    const account = await server.loadAccount(address);
+    const xlmBalance = account.balances.find((b) => b.asset_type === 'native')?.balance || '0';
+    return {
+      exists: true,
+      sequence: account.sequence,
+      xlmBalance,
+      balances: account.balances,
+    };
+  } catch (err: unknown) {
+    // 404 means unfunded/new account on this network
+    return {
+      exists: false,
+      sequence: '0',
+      xlmBalance: '0',
+      balances: [],
+    };
+  }
+}
+
+// Stellar address + transaction simulation utilities
 const CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
 
 export function generateStellarAddress(): string {

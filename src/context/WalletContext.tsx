@@ -1,15 +1,22 @@
-import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
 import {
   isConnected as freighterIsConnected,
   isAllowed as freighterIsAllowed,
   setAllowed as freighterSetAllowed,
   requestAccess as freighterRequestAccess,
   getAddress as freighterGetAddress,
-  getNetwork as freighterGetNetwork,
+  getNetworkDetails as freighterGetNetworkDetails,
+  WatchWalletChanges,
 } from '@stellar/freighter-api';
-import { shortAddress, generateStellarAddress } from '@/lib/stellar';
+import {
+  shortAddress,
+  generateStellarAddress,
+  fetchLiveAccount,
+  STELLAR_CONFIG,
+  type StellarNetwork,
+} from '@/lib/stellar';
 
-export type Network = 'TESTNET' | 'MAINNET';
+export type Network = StellarNetwork;
 
 export type WalletContextType = {
   address: string | null;
@@ -17,42 +24,101 @@ export type WalletContextType = {
   network: Network;
   isFreighterInstalled: boolean;
   isSimulated: boolean;
+  xlmBalance: string | null;
+  accountExists: boolean;
   error: string | null;
   connect: () => Promise<boolean>;
   connectSimulated: () => void;
   disconnect: () => void;
-  setNetwork: (n: Network) => void;
+  setNetwork: (n: Network) => Promise<void>;
   shortAddr: string;
+  refreshAccount: () => Promise<void>;
 };
 
 const WalletContext = createContext<WalletContextType | null>(null);
 
 export function WalletProvider({ children }: { children: ReactNode }) {
   const [address, setAddress] = useState<string | null>(null);
-  const [network, setNetwork] = useState<Network>('TESTNET');
+  const [network, setNetworkState] = useState<Network>('TESTNET');
   const [isFreighterInstalled, setIsFreighterInstalled] = useState<boolean>(false);
   const [isSimulated, setIsSimulated] = useState<boolean>(false);
+  const [xlmBalance, setXlmBalance] = useState<string | null>(null);
+  const [accountExists, setAccountExists] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Detect Freighter extension availability
+  // Helper to query live account status from Horizon RPC
+  const refreshAccount = useCallback(async () => {
+    if (!address) {
+      setXlmBalance(null);
+      setAccountExists(false);
+      return;
+    }
+    const info = await fetchLiveAccount(address, network);
+    setAccountExists(info.exists);
+    setXlmBalance(info.xlmBalance);
+  }, [address, network]);
+
   useEffect(() => {
+    refreshAccount();
+  }, [refreshAccount]);
+
+  // Synchronize network with Freighter
+  const syncNetworkFromFreighter = useCallback(async () => {
+    try {
+      const details = await freighterGetNetworkDetails();
+      if (details && !details.error && details.networkPassphrase) {
+        if (details.networkPassphrase === STELLAR_CONFIG.MAINNET.passphrase) {
+          setNetworkState('MAINNET');
+        } else {
+          setNetworkState('TESTNET');
+        }
+      }
+    } catch {
+      // Fallback
+    }
+  }, []);
+
+  // Listen to live wallet changes (accounts and networks) in Freighter
+  useEffect(() => {
+    let watcher: WatchWalletChanges | null = null;
     let isMounted = true;
-    const checkFreighter = async () => {
+
+    const setupFreighterWatcher = async () => {
       try {
         const res = await freighterIsConnected();
-        if (isMounted) {
-          setIsFreighterInstalled(!!res?.isConnected);
+        if (isMounted) setIsFreighterInstalled(!!res?.isConnected);
+
+        if (res?.isConnected) {
+          watcher = new WatchWalletChanges(1000);
+          watcher.watch((params) => {
+            if (!isMounted) return;
+            if (params.address) {
+              setAddress(params.address);
+              setIsSimulated(false);
+            }
+            if (params.networkPassphrase) {
+              if (params.networkPassphrase === STELLAR_CONFIG.MAINNET.passphrase) {
+                setNetworkState('MAINNET');
+              } else {
+                setNetworkState('TESTNET');
+              }
+            }
+          });
         }
       } catch {
         if (isMounted) setIsFreighterInstalled(false);
       }
     };
-    checkFreighter();
+
+    setupFreighterWatcher();
+
     return () => {
       isMounted = false;
+      if (watcher) watcher.stop();
     };
   }, []);
 
+  // Connect handler
   const connect = async (): Promise<boolean> => {
     setError(null);
     try {
@@ -63,7 +129,6 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       }
       setIsFreighterInstalled(true);
 
-      // Request user authorization in Freighter
       const accessObj = await freighterRequestAccess();
       let userAddress = accessObj?.address;
 
@@ -79,17 +144,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       if (userAddress) {
         setAddress(userAddress);
         setIsSimulated(false);
-        // Sync network if available
-        try {
-          const net = await freighterGetNetwork();
-          if (net?.network?.toUpperCase().includes('PUBLIC')) {
-            setNetwork('MAINNET');
-          } else {
-            setNetwork('TESTNET');
-          }
-        } catch {
-          // Keep current network
-        }
+        await syncNetworkFromFreighter();
         return true;
       } else {
         throw new Error('Could not retrieve address from Freighter.');
@@ -111,6 +166,12 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     setAddress(null);
     setIsSimulated(false);
     setError(null);
+    setXlmBalance(null);
+    setAccountExists(false);
+  };
+
+  const setNetwork = async (n: Network) => {
+    setNetworkState(n);
   };
 
   const value: WalletContextType = {
@@ -119,12 +180,15 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     network,
     isFreighterInstalled,
     isSimulated,
+    xlmBalance,
+    accountExists,
     error,
     connect,
     connectSimulated,
     disconnect,
     setNetwork,
     shortAddr: address ? shortAddress(address, 4) : '',
+    refreshAccount,
   };
 
   return <WalletContext.Provider value={value}>{children}</WalletContext.Provider>;
