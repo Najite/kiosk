@@ -11,7 +11,7 @@ import {
   Zap,
   ScrollText,
 } from 'lucide-react';
-import { kioskStorage, type Kiosk, type KioskItem, type TransferPolicy, type UpstreamRecipient } from '@/lib/supabase';
+import { kioskStorage, type Kiosk, type KioskItem, type TransferPolicy, type UpstreamRecipient } from '@/lib/kiosk';
 import { bpsToPercent, formatTokenAmount, formatDuration, calculatePayouts } from '@/lib/stellar';
 import { Panel, SectionTitle, Badge, Button, Input, Label, EmptyState, StatCard } from '@/components/ui';
 

@@ -41,7 +41,7 @@ StellarKiosk provides:
 - **Smart Contracts:** Rust, Soroban SDK (`soroban-sdk 21.0.0`), WebAssembly
 - **Frontend:** React 18, TypeScript, Vite, Tailwind CSS, Lucide Icons
 - **Stellar Tooling:** `@stellar/stellar-sdk`, `@stellar/freighter-api`
-- **Metadata & Simulation:** Supabase (PostgreSQL)
+- **Data & Protocol Layer:** Soroban Contract Storage + Stellar Horizon RPC (Zero Centralized Database)
 
 ---
 
@@ -59,8 +59,8 @@ kiosk/
 ├── Cargo.toml               # Soroban Cargo workspace configuration
 ├── src/
 │   ├── components/          # UI components (TopBar, Modals, Cards)
-│   ├── context/             # WalletContext (Freighter API & simulation layer)
-│   ├── lib/                 # Stellar address utilities & Supabase client
+│   ├── context/             # WalletContext (Freighter API & live RPC sync)
+│   ├── lib/                 # Stellar address utilities, Horizon RPC & Kiosk client
 │   └── views/               # Dashboard views (Kiosk, Policy, Widget, Marketplace, Grant)
 ├── .github/
 │   └── ISSUES.md            # Contributor issue backlog tagged by difficulty & sprint

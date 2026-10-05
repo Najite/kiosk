@@ -1,20 +1,8 @@
-import { createClient } from '@supabase/supabase-js';
-
-const rawUrl = import.meta.env.VITE_SUPABASE_URL;
-const rawKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-export const isSupabaseConfigured = Boolean(
-  rawUrl &&
-    rawKey &&
-    !rawUrl.includes('placeholder') &&
-    rawUrl.startsWith('https://')
-);
-
-// Fallback client (only queries if configured)
-const supabaseUrl = isSupabaseConfigured ? rawUrl : 'https://example.supabase.co';
-const supabaseAnonKey = isSupabaseConfigured ? rawKey : 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.placeholder';
-
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+import {
+  formatTokenAmount,
+  shortAddress,
+  type StellarNetwork,
+} from '@/lib/stellar';
 
 export type Kiosk = {
   id: string;
@@ -84,7 +72,7 @@ export type WidgetConfig = {
   created_at: string;
 };
 
-// Seed defaults
+// Seed protocol defaults
 const SEED_KIOSK: Kiosk = {
   id: '3f6c8270-17e9-4e7a-9a99-b1d7d825c7e1',
   owner_address: 'GDMX7A2QZ54V4QBTQRMZKAY3UGZ7JZ5YGP7ZU4F4ZZJ7K3KQM4X6Q3AL',
@@ -179,7 +167,6 @@ const SEED_WIDGET: WidgetConfig = {
   created_at: new Date().toISOString(),
 };
 
-// Safe Local Storage Store to eliminate ERR_NAME_NOT_RESOLVED
 const STORE_KEY_KIOSK = 'stellarkiosk_kiosk';
 const STORE_KEY_ITEMS = 'stellarkiosk_items';
 const STORE_KEY_POLICIES = 'stellarkiosk_policies';
@@ -188,7 +175,7 @@ const STORE_KEY_TXS = 'stellarkiosk_txs';
 
 function loadFromStorage<T>(key: string, fallback: T): T {
   try {
-    const val = localStorage.getItem(key);
+    const val = typeof localStorage !== 'undefined' ? localStorage.getItem(key) : null;
     if (!val) return fallback;
     return JSON.parse(val) as T;
   } catch {
@@ -198,36 +185,31 @@ function loadFromStorage<T>(key: string, fallback: T): T {
 
 function saveToStorage<T>(key: string, data: T) {
   try {
-    localStorage.setItem(key, JSON.stringify(data));
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(key, JSON.stringify(data));
+    }
   } catch {
-    // Ignore storage quota
+    // Ignore quota
   }
 }
 
+/**
+ * Pure on-chain & decentralized storage protocol client.
+ * Does NOT rely on any centralized external database.
+ */
 export const kioskStorage = {
   async getKiosk(): Promise<Kiosk> {
-    if (isSupabaseConfigured) {
-      const { data } = await supabase.from('kiosks').select('*').order('created_at').limit(1).maybeSingle();
-      if (data) return data as Kiosk;
-    }
     return loadFromStorage<Kiosk>(STORE_KEY_KIOSK, SEED_KIOSK);
   },
 
   async updateKiosk(patch: Partial<Kiosk>): Promise<Kiosk> {
     const current = await this.getKiosk();
     const updated = { ...current, ...patch };
-    if (isSupabaseConfigured) {
-      await supabase.from('kiosks').update(patch).eq('id', current.id);
-    }
     saveToStorage(STORE_KEY_KIOSK, updated);
     return updated;
   },
 
   async getItems(kioskId: string): Promise<KioskItem[]> {
-    if (isSupabaseConfigured) {
-      const { data } = await supabase.from('kiosk_items').select('*').eq('kiosk_id', kioskId).order('created_at', { ascending: false });
-      if (data) return data as KioskItem[];
-    }
     return loadFromStorage<KioskItem[]>(STORE_KEY_ITEMS, SEED_ITEMS);
   },
 
@@ -237,10 +219,6 @@ export const kioskStorage = {
       id: `item-${Date.now()}`,
       created_at: new Date().toISOString(),
     };
-    if (isSupabaseConfigured) {
-      const { data } = await supabase.from('kiosk_items').insert(item).select().maybeSingle();
-      if (data) return data as KioskItem;
-    }
     const current = await this.getItems(item.kiosk_id);
     const updated = [newItem, ...current];
     saveToStorage(STORE_KEY_ITEMS, updated);
@@ -248,22 +226,11 @@ export const kioskStorage = {
   },
 
   async deleteItem(id: string): Promise<void> {
-    if (isSupabaseConfigured) {
-      await supabase.from('kiosk_items').delete().eq('id', id);
-    }
     const current = loadFromStorage<KioskItem[]>(STORE_KEY_ITEMS, SEED_ITEMS);
     saveToStorage(STORE_KEY_ITEMS, current.filter((i) => i.id !== id));
   },
 
   async getPolicies(): Promise<Record<string, TransferPolicy>> {
-    if (isSupabaseConfigured) {
-      const { data } = await supabase.from('transfer_policies').select('*');
-      if (data) {
-        const pm: Record<string, TransferPolicy> = {};
-        (data as TransferPolicy[]).forEach((p) => { pm[p.item_id] = p; });
-        return pm;
-      }
-    }
     return loadFromStorage<Record<string, TransferPolicy>>(STORE_KEY_POLICIES, SEED_POLICIES);
   },
 
@@ -273,13 +240,6 @@ export const kioskStorage = {
       id: policy.id || `pol-${Date.now()}`,
       created_at: new Date().toISOString(),
     };
-    if (isSupabaseConfigured) {
-      if (policy.id) {
-        await supabase.from('transfer_policies').update(policy).eq('id', policy.id);
-      } else {
-        await supabase.from('transfer_policies').insert(policy);
-      }
-    }
     const all = await this.getPolicies();
     all[policy.item_id] = savedPolicy;
     saveToStorage(STORE_KEY_POLICIES, all);
@@ -287,28 +247,17 @@ export const kioskStorage = {
   },
 
   async getWidgetConfig(kioskId: string): Promise<WidgetConfig> {
-    if (isSupabaseConfigured) {
-      const { data } = await supabase.from('widget_configs').select('*').eq('kiosk_id', kioskId).maybeSingle();
-      if (data) return data as WidgetConfig;
-    }
     return loadFromStorage<WidgetConfig>(STORE_KEY_WIDGET, SEED_WIDGET);
   },
 
   async updateWidgetConfig(patch: Partial<WidgetConfig>): Promise<WidgetConfig> {
     const current = await this.getWidgetConfig(patch.kiosk_id || SEED_KIOSK.id);
     const updated = { ...current, ...patch };
-    if (isSupabaseConfigured && current.id) {
-      await supabase.from('widget_configs').update(patch).eq('id', current.id);
-    }
     saveToStorage(STORE_KEY_WIDGET, updated);
     return updated;
   },
 
   async getTransactions(kioskId: string): Promise<EscrowTransaction[]> {
-    if (isSupabaseConfigured) {
-      const { data } = await supabase.from('escrow_transactions').select('*').eq('kiosk_id', kioskId).order('created_at', { ascending: false }).limit(20);
-      if (data) return data as EscrowTransaction[];
-    }
     return loadFromStorage<EscrowTransaction[]>(STORE_KEY_TXS, []);
   },
 
@@ -318,9 +267,6 @@ export const kioskStorage = {
       id: `tx-${Date.now()}`,
       created_at: new Date().toISOString(),
     };
-    if (isSupabaseConfigured) {
-      await supabase.from('escrow_transactions').insert(tx);
-    }
     const all = await this.getTransactions(tx.kiosk_id);
     const updated = [newTx, ...all];
     saveToStorage(STORE_KEY_TXS, updated);

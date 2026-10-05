@@ -13,7 +13,7 @@ import {
   ExternalLink,
   Sparkles,
 } from 'lucide-react';
-import { kioskStorage, type Kiosk, type KioskItem, type TransferPolicy, type EscrowTransaction } from '@/lib/supabase';
+import { kioskStorage, type Kiosk, type KioskItem, type TransferPolicy, type EscrowTransaction } from '@/lib/kiosk';
 import {
   generateStellarAddress,
   generateTxHash,

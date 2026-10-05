@@ -13,7 +13,7 @@ import {
   Layers,
   Lock,
 } from 'lucide-react';
-import { kioskStorage, type Kiosk, type KioskItem } from '@/lib/supabase';
+import { kioskStorage, type Kiosk, type KioskItem } from '@/lib/kiosk';
 import {
   generateStellarAddress,
   generateContractId,

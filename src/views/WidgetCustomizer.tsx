@@ -11,7 +11,7 @@ import {
   Smartphone,
   Monitor,
 } from 'lucide-react';
-import { kioskStorage, type Kiosk, type KioskItem, type WidgetConfig } from '@/lib/supabase';
+import { kioskStorage, type Kiosk, type KioskItem, type WidgetConfig } from '@/lib/kiosk';
 import { formatTokenAmount } from '@/lib/stellar';
 import { Panel, SectionTitle, Badge, Button, Input, Label, Toggle } from '@/components/ui';
 
