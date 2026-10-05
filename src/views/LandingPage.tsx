@@ -5,8 +5,6 @@ import {
   Shield,
   Code2,
   GitBranch,
-  Clock,
-  Users,
   Layers,
   ShoppingCart,
   Wallet,
@@ -15,9 +13,7 @@ import {
   Store,
   FileText,
   Sparkles,
-  Terminal,
   Copy,
-  ChevronDown,
   Github,
   Twitter,
   ArrowUpRight,
@@ -26,8 +22,12 @@ import {
   Coins,
   TrendingUp,
   Globe,
+  Radio,
+  FlaskConical,
+  ChevronRight,
+  ScanLine,
+  Cpu,
 } from 'lucide-react';
-import { shortAddress } from '@/lib/stellar';
 
 export function LandingPage({ onEnter }: { onEnter: () => void }) {
   return (
@@ -35,12 +35,12 @@ export function LandingPage({ onEnter }: { onEnter: () => void }) {
       <LandingNav onEnter={onEnter} />
       <Hero onEnter={onEnter} />
       <TrustBar />
+      <ModeSection onEnter={onEnter} />
       <ProtocolDiagram />
       <Features />
       <HowItWorks />
-      <ComparisonSection />
       <WidgetDemo onEnter={onEnter} />
-      <Ecosystem onEnter={onEnter} />
+      <DashboardViews onEnter={onEnter} />
       <CTA onEnter={onEnter} />
       <Footer />
     </div>
@@ -62,7 +62,7 @@ function LandingNav({ onEnter }: { onEnter: () => void }) {
   return (
     <header
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-        scrolled ? 'bg-obsidian/80 backdrop-blur-xl border-b border-white/8' : 'bg-transparent'
+        scrolled ? 'bg-obsidian/85 backdrop-blur-xl border-b border-white/8' : 'bg-transparent'
       }`}
     >
       <div className="max-w-7xl mx-auto px-4 lg:px-6 h-16 flex items-center justify-between">
@@ -76,13 +76,19 @@ function LandingNav({ onEnter }: { onEnter: () => void }) {
         </div>
 
         <nav className="hidden md:flex items-center gap-6">
-          {['Protocol', 'Features', 'How it Works', 'Widget', 'Grant'].map((item) => (
+          {[
+            { label: 'Modes', href: '#modes' },
+            { label: 'Protocol', href: '#protocol' },
+            { label: 'Features', href: '#features' },
+            { label: 'How it Works', href: '#how-it-works' },
+            { label: 'Widget', href: '#widget' },
+          ].map((item) => (
             <a
-              key={item}
-              href={`#${item.toLowerCase().replace(/\s+/g, '-')}`}
+              key={item.label}
+              href={item.href}
               className="text-sm text-gray-400 hover:text-white transition-colors"
             >
-              {item}
+              {item.label}
             </a>
           ))}
         </nav>
@@ -93,13 +99,13 @@ function LandingNav({ onEnter }: { onEnter: () => void }) {
             className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-gray-400 hover:text-white hover:bg-white/5 transition-colors"
           >
             <Github className="h-4 w-4" />
-            Docs
+            GitHub
           </a>
           <button
             onClick={onEnter}
             className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-cyan text-obsidian text-sm font-semibold hover:bg-cyan-dim transition-all hover:shadow-lg hover:shadow-cyan/20"
           >
-            Launch Dashboard
+            Launch App
             <ArrowRight className="h-3.5 w-3.5" />
           </button>
         </div>
@@ -117,15 +123,16 @@ function Hero({ onEnter }: { onEnter: () => void }) {
       {/* Background effects */}
       <div className="absolute inset-0 bg-grid-pattern bg-[size:40px_40px] opacity-40" />
       <div className="absolute inset-0 bg-cyan-glow" />
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[600px] bg-gradient-radial from-cyan/5 to-transparent rounded-full blur-3xl" style={{ background: 'radial-gradient(ellipse, rgba(0,229,255,0.06), transparent 70%)' }} />
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[900px] h-[600px] rounded-full blur-3xl" style={{ background: 'radial-gradient(ellipse, rgba(0,229,255,0.07), transparent 70%)' }} />
 
-      {/* Floating orbs */}
+      {/* Floating particles */}
       <div className="absolute top-40 left-10 w-2 h-2 rounded-full bg-cyan animate-float opacity-60" />
       <div className="absolute top-60 right-20 w-1.5 h-1.5 rounded-full bg-emerald animate-float-delayed opacity-50" />
       <div className="absolute top-32 right-1/3 w-1 h-1 rounded-full bg-amber animate-float opacity-40" />
+      <div className="absolute bottom-20 left-1/4 w-1 h-1 rounded-full bg-cyan/60 animate-float-delayed opacity-30" />
 
       <div className="relative max-w-7xl mx-auto">
-        <div className="grid lg:grid-cols-[1.1fr_1fr] gap-12 items-center">
+        <div className="grid lg:grid-cols-[1.15fr_1fr] gap-14 items-center">
           {/* Left: copy */}
           <div className="text-center lg:text-left animate-slide-up">
             {/* Badge */}
@@ -134,21 +141,23 @@ function Hero({ onEnter }: { onEnter: () => void }) {
                 <span className="absolute inline-flex h-full w-full rounded-full bg-emerald opacity-60 animate-ping" />
                 <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald" />
               </span>
-              <span className="text-xs text-gray-400">Built for Stellar Community Fund · Season 23</span>
+              <span className="text-xs text-gray-400">SCF Season 23 · Live on Stellar Mainnet &amp; Testnet</span>
             </div>
 
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-white tracking-tight leading-[1.1]">
-              Composable Escrow &
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-white tracking-tight leading-[1.08]">
+              On-Chain Escrow &amp;
               <br />
-              <span className="text-gradient-cyan">Digital Asset Protocol</span>
+              <span className="text-gradient-cyan">Digital Asset Commerce</span>
               <br />
               on Stellar
             </h1>
 
             <p className="mt-6 text-base lg:text-lg text-gray-400 leading-relaxed max-w-xl mx-auto lg:mx-0">
-              Sui's flagship Kiosk architecture, ported to Soroban. Programmable transfer policies,
-              automated royalty splits, upstream dependency drips, and an embeddable checkout widget —
-              without writing a single escrow contract.
+              A Soroban-native Kiosk protocol with composable transfer policies, upstream dependency
+              drips, and an embeddable checkout widget — connect your{' '}
+              <span className="text-emerald font-medium">Freighter wallet</span> to go live, or explore
+              the full protocol in{' '}
+              <span className="text-amber font-medium">Sandbox mode</span> instantly.
             </p>
 
             <div className="mt-8 flex flex-col sm:flex-row items-center gap-3 justify-center lg:justify-start">
@@ -160,11 +169,11 @@ function Hero({ onEnter }: { onEnter: () => void }) {
                 <ArrowRight className="h-4 w-4 group-hover:translate-x-0.5 transition-transform" />
               </button>
               <a
-                href="#protocol"
+                href="#modes"
                 className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-white/5 border border-white/10 text-white font-medium text-sm hover:bg-white/10 transition-all w-full sm:w-auto justify-center"
               >
-                <Terminal className="h-4 w-4" />
-                Explore the Protocol
+                <ScanLine className="h-4 w-4" />
+                Explore Modes
               </a>
             </div>
 
@@ -183,7 +192,7 @@ function Hero({ onEnter }: { onEnter: () => void }) {
             </div>
           </div>
 
-          {/* Right: animated terminal/card mock */}
+          {/* Right: animated visual */}
           <div className="relative animate-slide-up-delayed">
             <HeroVisual />
           </div>
@@ -195,15 +204,16 @@ function Hero({ onEnter }: { onEnter: () => void }) {
 
 function HeroVisual() {
   const [tick, setTick] = useState(0);
+  const [mode, setMode] = useState<'live' | 'sandbox'>('live');
   useEffect(() => {
-    const id = setInterval(() => setTick((t) => t + 1), 2500);
+    const id = setInterval(() => setTick((t) => t + 1), 2800);
     return () => clearInterval(id);
   }, []);
 
   const steps = [
-    { label: 'Buyer signs transaction', color: 'text-cyan', icon: Wallet },
-    { label: 'Atomic escrow validates', color: 'text-amber', icon: Shield },
-    { label: 'Funds split & settle', color: 'text-emerald', icon: Check },
+    { label: 'Freighter signs transaction', color: 'text-cyan', icon: Wallet },
+    { label: 'Soroban escrow validates policy', color: 'text-amber', icon: Shield },
+    { label: 'Funds split atomically on-chain', color: 'text-emerald', icon: Check },
   ];
   const activeStep = tick % 3;
 
@@ -212,49 +222,73 @@ function HeroVisual() {
       {/* Glow ring */}
       <div className="absolute -inset-4 bg-gradient-to-br from-cyan/10 via-transparent to-emerald/5 rounded-3xl blur-2xl animate-glow-breath" />
 
-      {/* Terminal card */}
       <div className="relative panel p-0 overflow-hidden rounded-2xl shadow-2xl">
-        {/* Terminal header */}
+        {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-white/8 bg-obsidianLight">
           <div className="flex items-center gap-1.5">
             <span className="h-3 w-3 rounded-full bg-rose/70" />
             <span className="h-3 w-3 rounded-full bg-amber/70" />
             <span className="h-3 w-3 rounded-full bg-emerald/70" />
           </div>
-          <span className="mono text-[11px] text-gray-600">soroban-escrow — stellar testnet</span>
+          {/* Mode toggle */}
+          <div className="flex items-center gap-1 bg-white/5 rounded-md p-0.5">
+            <button
+              onClick={() => setMode('live')}
+              className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium transition-all ${
+                mode === 'live' ? 'bg-emerald/20 text-emerald' : 'text-gray-600'
+              }`}
+            >
+              <Radio className="h-2.5 w-2.5" /> Live
+            </button>
+            <button
+              onClick={() => setMode('sandbox')}
+              className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium transition-all ${
+                mode === 'sandbox' ? 'bg-amber/20 text-amber' : 'text-gray-600'
+              }`}
+            >
+              <FlaskConical className="h-2.5 w-2.5" /> Sandbox
+            </button>
+          </div>
         </div>
 
-        {/* Terminal body */}
         <div className="p-5 space-y-4 bg-obsidian">
+          {/* Mode indicator */}
+          <div className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-[10px] font-medium transition-all ${
+            mode === 'live'
+              ? 'bg-emerald/8 border-emerald/20 text-emerald'
+              : 'bg-amber/8 border-amber/20 text-amber'
+          }`}>
+            {mode === 'live' ? <Radio className="h-3 w-3" /> : <FlaskConical className="h-3 w-3" />}
+            {mode === 'live'
+              ? 'Live Account Mode · Freighter Connected · Horizon RPC Active'
+              : 'Sandbox Mode · No wallet required · Demo data isolated'}
+          </div>
+
           {/* Code block */}
           <div className="space-y-1.5">
             <CodeLine line={1} text="let kiosk = Kiosk::init(owner, 'XLM');" color="text-gray-500" />
             <CodeLine line={2} text="kiosk.set_policy(royalty: 10%);" color="text-cyan" />
             <CodeLine line={3} text="kiosk.add_upstream_drip('sdk-rs', 8%);" color="text-amber" />
             <CodeLine line={4} text="kiosk.list(item, price: 50 XLM);" color="text-emerald" />
-            <CodeLine line={5} text="→ escrow ready for purchase" color="text-gray-600" />
+            <CodeLine line={5} text="→ escrow ready for atomic purchase" color="text-gray-600" />
           </div>
 
-          {/* Animated flow */}
+          {/* Animated steps */}
           <div className="pt-3 border-t border-white/8 space-y-2">
             {steps.map((s, i) => {
               const Icon = s.icon;
               const active = i === activeStep;
-              const done = i < activeStep || (activeStep === 2 && i === 2);
+              const done = i < activeStep;
               return (
                 <div
                   key={i}
                   className={`flex items-center gap-2.5 px-3 py-2 rounded-lg border transition-all duration-300 ${
-                    active
-                      ? 'bg-white/5 border-cyan/20 scale-[1.02]'
-                      : 'bg-transparent border-white/5'
+                    active ? 'bg-white/5 border-cyan/20 scale-[1.02]' : 'bg-transparent border-white/5'
                   }`}
                 >
-                  <div
-                    className={`flex h-6 w-6 items-center justify-center rounded-md transition-colors ${
-                      active ? 'bg-cyan/15' : done ? 'bg-emerald/15' : 'bg-white/5'
-                    }`}
-                  >
+                  <div className={`flex h-6 w-6 items-center justify-center rounded-md transition-colors ${
+                    active ? 'bg-cyan/15' : done ? 'bg-emerald/15' : 'bg-white/5'
+                  }`}>
                     <Icon className={`h-3.5 w-3.5 ${active ? s.color : done ? 'text-emerald' : 'text-gray-600'}`} />
                   </div>
                   <span className={`text-xs transition-colors ${active ? 'text-white' : done ? 'text-gray-400' : 'text-gray-600'}`}>
@@ -286,10 +320,10 @@ function HeroVisual() {
         </div>
       </div>
 
-      {/* Floating badges */}
+      {/* Floating badge */}
       <div className="absolute -top-3 -right-3 panel px-3 py-1.5 rounded-lg flex items-center gap-1.5 animate-float">
         <span className="h-1.5 w-1.5 rounded-full bg-emerald animate-pulse" />
-        <span className="text-[10px] text-gray-300 font-medium">Live on Testnet</span>
+        <span className="text-[10px] text-gray-300 font-medium">Live on Mainnet + Testnet</span>
       </div>
     </div>
   );
@@ -311,11 +345,13 @@ function TrustBar() {
   const items = [
     'Soroban Smart Contracts',
     'Freighter Wallet',
+    'Stellar Mainnet',
     'Stellar Testnet',
     'Atomic Settlement',
     'MIT Licensed',
     'Drips-Style Splits',
     'Zero-Dependency Widget',
+    'Live + Sandbox Modes',
     'SCF Season 23',
   ];
   return (
@@ -338,12 +374,11 @@ function TrustBar() {
 function ProtocolDiagram() {
   return (
     <section id="protocol" className="py-20 px-4 lg:px-6 relative">
-      <div className="absolute inset-0 bg-emerald-glow opacity-30" />
       <div className="relative max-w-7xl mx-auto">
         <SectionHeader
           tag="Architecture"
           title="The Kiosk Protocol"
-          subtitle="A Soroban-native escrow account that enforces transfer policies without opaque custodial contracts."
+          subtitle="A Soroban-native escrow account that enforces transfer policies entirely on-chain — no centralized intermediary."
         />
 
         {/* Diagram */}
@@ -360,7 +395,6 @@ function ProtocolDiagram() {
             {/* Left: Kiosk core */}
             <div className="flex flex-col items-center text-center">
               <div className="relative">
-                {/* Pulse ring */}
                 <div className="absolute inset-0 rounded-2xl border border-cyan/20 animate-pulse-ring" />
                 <div className="relative panel p-6 w-48 h-48 flex flex-col items-center justify-center gap-2 rounded-2xl bg-gradient-to-br from-cyan/8 to-transparent">
                   <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-cyan/15 border border-cyan/25">
@@ -368,6 +402,10 @@ function ProtocolDiagram() {
                   </div>
                   <p className="text-sm font-bold text-white">Soroban Kiosk</p>
                   <p className="text-[11px] text-gray-500 leading-snug">On-chain escrow account</p>
+                  <div className="flex items-center gap-1 mt-1">
+                    <span className="h-1 w-1 rounded-full bg-emerald animate-pulse" />
+                    <span className="text-[9px] text-gray-600">Horizon RPC</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -383,9 +421,33 @@ function ProtocolDiagram() {
             <div className="flex flex-col gap-3">
               <DiagramNode icon={Code2} label="Embeddable Web Widget" sub="Drop into any site in 60s" color="cyan" />
               <DiagramNode icon={ShoppingCart} label="Atomic Checkout" sub="Sign → Split → Settle" color="emerald" />
-              <DiagramNode icon={Activity} label="Real-time Ledger" sub="Track every payout" color="amber" />
+              <DiagramNode icon={Activity} label="Real-time Ledger" sub="Track every payout on-chain" color="amber" />
             </div>
           </div>
+        </div>
+
+        {/* Stats row */}
+        <div className="mt-6 grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {[
+            { icon: TrendingUp, value: '~5s', label: 'Settlement Finality', color: 'cyan' },
+            { icon: Coins, value: '0.00001', label: 'XLM per Transaction', color: 'emerald' },
+            { icon: Layers, value: '3', label: 'Escrow Release Modes', color: 'amber' },
+            { icon: Globe, value: '∞', label: 'Upstream Recipients per Sale', color: 'cyan' },
+          ].map((s, i) => {
+            const Icon = s.icon;
+            const colorCls: Record<string, string> = {
+              cyan: 'text-cyan',
+              emerald: 'text-emerald',
+              amber: 'text-amber',
+            };
+            return (
+              <div key={i} className="panel p-5 text-center hover:border-white/15 transition-all">
+                <Icon className={`h-5 w-5 mx-auto mb-2 ${colorCls[s.color]} opacity-60`} />
+                <p className={`mono text-2xl font-bold ${colorCls[s.color]}`}>{s.value}</p>
+                <p className="text-[10px] uppercase tracking-wider text-gray-600 mt-1">{s.label}</p>
+              </div>
+            );
+          })}
         </div>
       </div>
     </section>
@@ -452,14 +514,14 @@ function Features() {
     },
     {
       icon: Wallet,
-      title: 'Multi-Wallet Support',
-      desc: 'Built for Freighter, Albedo, and testnet keypairs. Buyers sign a single atomic transaction — funds split in real time at settlement.',
+      title: 'Freighter + Live RPC',
+      desc: 'Connect Freighter to switch into Live Account Mode. StellarKiosk queries Horizon directly — your real kiosk state is always on-chain, never in a database.',
       color: 'emerald',
     },
     {
-      icon: Coins,
-      title: 'XLM & USDC Settlement',
-      desc: 'Native Stellar Lumens or Stellar USDC as settlement tokens. Switch per-kiosk with a single click. Low fees make micro-sales viable.',
+      icon: Cpu,
+      title: 'Soroban-Native Storage',
+      desc: 'Kiosk state, listings, and policies are stored in Soroban contract storage. Each account gets its own scoped namespace — demo and live data never mix.',
       color: 'amber',
     },
   ];
@@ -509,25 +571,25 @@ function HowItWorks() {
       num: '01',
       icon: Boxes,
       title: 'Initialize a Kiosk',
-      desc: 'Deploy a Soroban escrow contract with a single click. Choose your settlement token and kiosk name.',
+      desc: 'Connect Freighter or open Sandbox. Deploy a Soroban escrow contract with a single click — choose your settlement token (XLM or USDC).',
     },
     {
       num: '02',
       icon: Shield,
       title: 'Configure Policies',
-      desc: 'Set royalties, upstream splits, and escrow release mode. The policy engine validates every transfer on-chain.',
+      desc: 'Set royalties, upstream dependency drips, and your escrow release mode. The policy engine validates every transfer on-chain.',
     },
     {
       num: '03',
       icon: Code2,
-      title: 'Embed the Widget',
-      desc: 'Copy a single line of code into your docs, blog, or marketplace. The widget handles the entire checkout flow.',
+      title: 'List & Embed',
+      desc: 'Add items to your kiosk and copy a single embed snippet for your docs, blog, or marketplace. The widget handles checkout end-to-end.',
     },
     {
       num: '04',
       icon: Check,
       title: 'Settle Atomically',
-      desc: 'Buyer signs once. Funds split to seller, creator, and upstream recipients in a single atomic transaction.',
+      desc: 'Buyer signs once. Funds split to seller, creator, and upstream recipients in a single atomic Soroban transaction.',
     },
   ];
 
@@ -538,11 +600,10 @@ function HowItWorks() {
         <SectionHeader
           tag="Workflow"
           title="From zero to settled in four steps"
-          subtitle="No smart contract experience required. The dashboard handles the complexity."
+          subtitle="No smart contract experience required. The dashboard handles every layer of complexity."
         />
 
         <div className="mt-12 grid sm:grid-cols-2 lg:grid-cols-4 gap-4 relative">
-          {/* Connecting line */}
           <div className="hidden lg:block absolute top-14 left-[12.5%] right-[12.5%] h-px bg-gradient-to-r from-cyan/20 via-emerald/20 to-amber/20" />
 
           {steps.map((s, i) => {
@@ -561,6 +622,9 @@ function HowItWorks() {
                   <h3 className="text-sm font-semibold text-white mt-4 mb-2">{s.title}</h3>
                   <p className="text-xs text-gray-500 leading-relaxed">{s.desc}</p>
                 </div>
+                {i < steps.length - 1 && (
+                  <ChevronRight className="hidden lg:block absolute top-14 -right-2 h-4 w-4 text-gray-700 z-10" />
+                )}
               </div>
             );
           })}
@@ -571,63 +635,218 @@ function HowItWorks() {
 }
 
 /* ============================================================
-   COMPARISON
+   MODE SECTION
    ============================================================ */
-function ComparisonSection() {
-  const rows = [
-    { feature: 'Escrow Architecture', sui: 'Object-centric Kiosk', stellar: 'Soroban contract Kiosk', stellarBetter: true },
-    { feature: 'Creator Royalties', sui: 'Transfer policy', stellar: 'BPS-based policy engine', stellarBetter: false },
-    { feature: 'Upstream Dependency Splits', sui: 'Not native', stellar: 'Built-in Drips-style drip', stellarBetter: true },
-    { feature: 'Embeddable Widget', sui: 'Requires dApp', stellar: 'Zero-dependency Web Component', stellarBetter: true },
-    { feature: 'Escrow Modes', sui: 'Custom', stellar: 'Instant / Timelock / Multi-sig', stellarBetter: false },
-    { feature: 'Settlement Cost', sui: '~$0.01', stellar: '~$0.00001 XLM', stellarBetter: true },
-    { feature: 'Wallet Support', sui: 'Sui wallets', stellar: 'Freighter / Albedo / xBull', stellarBetter: false },
-    { feature: 'License', sui: 'Apache 2.0', stellar: 'MIT', stellarBetter: false },
-  ];
+function ModeSection({ onEnter }: { onEnter: () => void }) {
+  const [active, setActive] = useState<'live' | 'sandbox'>('live');
+
+  const modes = {
+    live: {
+      icon: Radio,
+      color: 'emerald' as const,
+      label: 'Live Account Mode',
+      badge: 'Freighter Connected',
+      tagline: 'Real assets. Real settlement. Your Stellar account.',
+      desc: 'Connect your Freighter wallet and StellarKiosk automatically detects your on-chain state. Your kiosks, listings, and policies are read directly from Horizon RPC — no intermediary database, no custodial risk.',
+      points: [
+        'Queries Horizon RPC for your live account data',
+        'All kiosk state lives on-chain via Soroban storage',
+        'Purchases execute real atomic transactions',
+        'Works on Mainnet and Testnet, switchable in-app',
+      ],
+      cta: 'Connect Freighter & Go Live',
+    },
+    sandbox: {
+      icon: FlaskConical,
+      color: 'amber' as const,
+      label: 'Sandbox Mode',
+      badge: 'No wallet required',
+      tagline: 'Explore the full protocol. No gas. No keys.',
+      desc: 'Sandbox gives you a fully isolated environment to create kiosks, set policies, list items, and simulate purchases — completely offline. Demo data is scoped to your browser session and never touches the chain.',
+      points: [
+        'Full protocol simulation with realistic demo data',
+        'Account-scoped storage — demo data stays separate from live',
+        'No Freighter needed — great for demos and evaluation',
+        'Switch to Live mode at any time without losing demo data',
+      ],
+      cta: 'Open Sandbox Dashboard',
+    },
+  };
+
+  const m = modes[active];
+  const ModeIcon = m.icon;
+  const colorMap = {
+    emerald: 'text-emerald border-emerald/20 bg-emerald/8',
+    amber: 'text-amber border-amber/20 bg-amber/8',
+  };
+  const dotMap = { emerald: 'bg-emerald', amber: 'bg-amber' };
+  const btnMap = {
+    emerald: 'bg-emerald/20 text-emerald border border-emerald/30 hover:bg-emerald/30',
+    amber: 'bg-amber/20 text-amber border border-amber/30 hover:bg-amber/30',
+  };
 
   return (
-    <section className="py-20 px-4 lg:px-6">
-      <div className="max-w-5xl mx-auto">
+    <section id="modes" className="py-20 px-4 lg:px-6 relative">
+      <div className="absolute inset-0 bg-emerald-glow opacity-20" />
+      <div className="relative max-w-7xl mx-auto">
         <SectionHeader
-          tag="Competitive Analysis"
-          title="Sui Kiosk, evolved for Stellar"
-          subtitle="StellarKiosk takes the best of Sui's Kiosk and adds what's missing — upstream drips, embeddable widgets, and micro-fee settlement."
+          tag="Two Modes"
+          title="Live or Sandbox — you decide"
+          subtitle="StellarKiosk works without a backend. Connect a wallet for real on-chain commerce, or explore everything instantly in Sandbox mode."
         />
 
-        <div className="mt-12 panel overflow-hidden">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-white/10">
-                <th className="py-4 px-5 text-left text-xs uppercase tracking-wider text-gray-600 font-medium">Feature</th>
-                <th className="py-4 px-5 text-left text-xs uppercase tracking-wider text-gray-600 font-medium">Sui Kiosk</th>
-                <th className="py-4 px-5 text-left text-xs uppercase tracking-wider text-cyan font-medium">
-                  <span className="flex items-center gap-1.5">
-                    <Sparkles className="h-3.5 w-3.5" />
-                    StellarKiosk
-                  </span>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row, i) => (
-                <tr key={i} className="border-b border-white/5 hover:bg-white/3 transition-colors">
-                  <td className="py-3.5 px-5 text-gray-300 font-medium">{row.feature}</td>
-                  <td className="py-3.5 px-5 text-gray-500">{row.sui}</td>
-                  <td className="py-3.5 px-5">
-                    <span className={`flex items-center gap-1.5 ${row.stellarBetter ? 'text-cyan font-medium' : 'text-gray-300'}`}>
-                      {row.stellarBetter && <Check className="h-3.5 w-3.5 text-emerald" />}
-                      {row.stellar}
-                    </span>
-                  </td>
-                </tr>
+        {/* Toggle */}
+        <div className="mt-10 flex justify-center">
+          <div className="inline-flex items-center gap-1 p-1 rounded-xl bg-white/5 border border-white/10">
+            {(['live', 'sandbox'] as const).map((k) => {
+              const cfg = modes[k];
+              const Ico = cfg.icon;
+              const isActive = active === k;
+              return (
+                <button
+                  key={k}
+                  onClick={() => setActive(k)}
+                  className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                    isActive
+                      ? k === 'live'
+                        ? 'bg-emerald/15 text-emerald border border-emerald/25'
+                        : 'bg-amber/15 text-amber border border-amber/25'
+                      : 'text-gray-500 hover:text-gray-300'
+                  }`}
+                >
+                  <Ico className="h-4 w-4" />
+                  {cfg.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Card */}
+        <div className="mt-8 panel p-0 overflow-hidden rounded-2xl max-w-4xl mx-auto">
+          <div className={`px-6 py-4 border-b border-white/8 flex items-center gap-3 ${colorMap[m.color]}`}>
+            <ModeIcon className="h-5 w-5" />
+            <span className="text-sm font-semibold">{m.label}</span>
+            <span className="ml-auto inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/10 text-[10px] font-medium">
+              <span className={`h-1.5 w-1.5 rounded-full ${dotMap[m.color]} animate-pulse`} />
+              {m.badge}
+            </span>
+          </div>
+
+          <div className="p-6 lg:p-8 grid lg:grid-cols-[1.1fr_1fr] gap-8 items-start">
+            <div>
+              <p className="text-lg font-semibold text-white mb-3">{m.tagline}</p>
+              <p className="text-sm text-gray-400 leading-relaxed">{m.desc}</p>
+              <button
+                onClick={onEnter}
+                className={`mt-6 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all hover:opacity-90 ${btnMap[m.color]}`}
+              >
+                {m.cta}
+                <ArrowRight className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              {m.points.map((pt, i) => (
+                <div key={i} className="flex items-start gap-3">
+                  <div className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${
+                    active === 'live' ? 'bg-emerald/15' : 'bg-amber/15'
+                  }`}>
+                    <Check className={`h-3 w-3 ${active === 'live' ? 'text-emerald' : 'text-amber'}`} />
+                  </div>
+                  <span className="text-sm text-gray-300 leading-snug">{pt}</span>
+                </div>
               ))}
-            </tbody>
-          </table>
+            </div>
+          </div>
         </div>
       </div>
     </section>
   );
 }
+
+/* ============================================================
+   DASHBOARD VIEWS
+   ============================================================ */
+function DashboardViews({ onEnter }: { onEnter: () => void }) {
+  const views = [
+    {
+      icon: Boxes,
+      title: 'Kiosk Manager',
+      desc: 'Initialize and manage your Soroban escrow account. Works in both Live and Sandbox modes.',
+      color: 'cyan',
+    },
+    {
+      icon: Shield,
+      title: 'Escrow Policies',
+      desc: 'Configure royalties, upstream drips, and escrow release modes with a visual editor.',
+      color: 'emerald',
+    },
+    {
+      icon: Code2,
+      title: 'Embed Widget',
+      desc: 'Customize and export your zero-dependency checkout widget code in React or HTML.',
+      color: 'amber',
+    },
+    {
+      icon: Store,
+      title: 'Live Marketplace',
+      desc: 'Browse all listed assets and execute atomic purchases via Freighter or Sandbox simulation.',
+      color: 'cyan',
+    },
+    {
+      icon: FileText,
+      title: 'SCF Grant Proposal',
+      desc: 'Export a publication-ready Stellar Community Fund grant application from your kiosk data.',
+      color: 'emerald',
+    },
+  ];
+
+  const colorMap: Record<string, string> = {
+    cyan: 'text-cyan bg-cyan/8 border-cyan/15 group-hover:border-cyan/30',
+    emerald: 'text-emerald bg-emerald/8 border-emerald/15 group-hover:border-emerald/30',
+    amber: 'text-amber bg-amber/8 border-amber/15 group-hover:border-amber/30',
+  };
+  const arrowMap: Record<string, string> = {
+    cyan: 'group-hover:text-cyan',
+    emerald: 'group-hover:text-emerald',
+    amber: 'group-hover:text-amber',
+  };
+
+  return (
+    <section className="py-20 px-4 lg:px-6 relative">
+      <div className="absolute inset-0 bg-cyan-glow opacity-25" />
+      <div className="relative max-w-7xl mx-auto">
+        <SectionHeader
+          tag="Dashboard"
+          title="Five powerful views, one protocol"
+          subtitle="The StellarKiosk dashboard gives you full control over your decentralized commerce stack — from initialization to payout tracking."
+        />
+
+        <div className="mt-12 grid sm:grid-cols-2 lg:grid-cols-5 gap-3">
+          {views.map((v, i) => {
+            const Icon = v.icon;
+            return (
+              <div
+                key={i}
+                className="panel p-5 group hover:border-white/15 transition-all cursor-pointer hover:-translate-y-1 duration-200"
+                onClick={onEnter}
+              >
+                <div className={`flex h-10 w-10 items-center justify-center rounded-lg border mb-3 transition-all group-hover:scale-110 ${colorMap[v.color]}`}>
+                  <Icon className="h-5 w-5" />
+                </div>
+                <h3 className="text-sm font-semibold text-white mb-1">{v.title}</h3>
+                <p className="text-xs text-gray-500 leading-relaxed">{v.desc}</p>
+                <ArrowUpRight className={`h-3.5 w-3.5 text-gray-700 mt-3 transition-colors ${arrowMap[v.color]}`} />
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 
 /* ============================================================
    WIDGET DEMO
@@ -858,78 +1077,6 @@ export default function DocsPage() {
   );
 }
 
-/* ============================================================
-   ECOSYSTEM / STATS
-   ============================================================ */
-function Ecosystem({ onEnter }: { onEnter: () => void }) {
-  const stats = [
-    { icon: TrendingUp, value: '~5s', label: 'Settlement Finality', color: 'cyan' },
-    { icon: Coins, value: '0.00001', label: 'XLM per Transaction', color: 'emerald' },
-    { icon: Layers, value: '3', label: 'Escrow Release Modes', color: 'amber' },
-    { icon: Globe, value: '∞', label: 'Upstream Recipients per Sale', color: 'cyan' },
-  ];
-
-  const views = [
-    { icon: Boxes, title: 'Kiosk Manager', desc: 'Deploy and manage your Soroban escrow account.' },
-    { icon: Shield, title: 'Escrow Policies', desc: 'Configure royalties, drips, and release modes.' },
-    { icon: Code2, title: 'Embed Widget', desc: 'Customize and generate your checkout widget.' },
-    { icon: Store, title: 'Live Marketplace', desc: 'Browse assets and execute atomic purchases.' },
-    { icon: FileText, title: 'SCF Grant Proposal', desc: 'Export a publication-ready grant application.' },
-  ];
-
-  return (
-    <section id="grant" className="py-20 px-4 lg:px-6 relative">
-      <div className="absolute inset-0 bg-cyan-glow opacity-30" />
-      <div className="relative max-w-7xl mx-auto">
-        <SectionHeader
-          tag="Dashboard"
-          title="Five powerful views, one protocol"
-          subtitle="The StellarKiosk dashboard gives you complete control over your decentralized commerce stack."
-        />
-
-        {/* Stats */}
-        <div className="mt-12 grid grid-cols-2 lg:grid-cols-4 gap-3">
-          {stats.map((s, i) => {
-            const Icon = s.icon;
-            const colors: Record<string, string> = {
-              cyan: 'text-cyan',
-              emerald: 'text-emerald',
-              amber: 'text-amber',
-            };
-            return (
-              <div key={i} className="panel p-5 text-center group hover:border-white/15 transition-all">
-                <Icon className={`h-5 w-5 mx-auto mb-3 ${colors[s.color]} opacity-60`} />
-                <p className={`mono text-3xl font-bold ${colors[s.color]}`}>{s.value}</p>
-                <p className="text-[10px] uppercase tracking-wider text-gray-600 mt-1">{s.label}</p>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* View cards */}
-        <div className="mt-6 grid sm:grid-cols-2 lg:grid-cols-5 gap-3">
-          {views.map((v, i) => {
-            const Icon = v.icon;
-            return (
-              <div
-                key={i}
-                className="panel-tight p-4 group hover:border-cyan/15 hover:bg-cyan/3 transition-all cursor-pointer"
-                onClick={onEnter}
-              >
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-cyan/8 border border-cyan/15 text-cyan mb-3 group-hover:scale-110 transition-transform">
-                  <Icon className="h-5 w-5" />
-                </div>
-                <h3 className="text-sm font-semibold text-white mb-1">{v.title}</h3>
-                <p className="text-xs text-gray-500 leading-relaxed">{v.desc}</p>
-                <ArrowUpRight className="h-3.5 w-3.5 text-gray-700 group-hover:text-cyan mt-3 transition-colors" />
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    </section>
-  );
-}
 
 /* ============================================================
    CTA
@@ -946,7 +1093,7 @@ function CTA({ onEnter }: { onEnter: () => void }) {
           <div className="relative">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan/10 border border-cyan/20 mb-6">
               <Sparkles className="h-3.5 w-3.5 text-cyan" />
-              <span className="text-xs text-cyan font-medium">Ready for Stellar Community Fund</span>
+              <span className="text-xs text-cyan font-medium">Stellar Community Fund · Season 23</span>
             </div>
 
             <h2 className="text-3xl lg:text-4xl font-bold text-white tracking-tight">
@@ -955,8 +1102,8 @@ function CTA({ onEnter }: { onEnter: () => void }) {
               <span className="text-gradient-cyan">in under 60 seconds</span>
             </h2>
             <p className="mt-4 text-sm text-gray-400 max-w-lg mx-auto">
-              Launch the dashboard, initialize a Kiosk, and generate your embeddable checkout widget —
-              no smart contract experience required.
+              Connect Freighter to go live on Mainnet or Testnet, or jump straight into Sandbox mode
+              — no wallet, no gas, no setup required.
             </p>
 
             <div className="mt-8 flex flex-col sm:flex-row items-center gap-3 justify-center">
@@ -968,12 +1115,27 @@ function CTA({ onEnter }: { onEnter: () => void }) {
                 <ArrowRight className="h-4 w-4 group-hover:translate-x-0.5 transition-transform" />
               </button>
               <a
-                href="#protocol"
+                href="https://github.com"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-white/5 border border-white/10 text-white font-medium text-sm hover:bg-white/10 transition-all w-full sm:w-auto justify-center"
               >
                 <Github className="h-4 w-4" />
                 View on GitHub
               </a>
+            </div>
+
+            {/* Mode pills */}
+            <div className="mt-8 flex items-center justify-center gap-3">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald/10 border border-emerald/20 text-[11px] text-emerald font-medium">
+                <Radio className="h-3 w-3" />
+                Live Account Mode
+              </div>
+              <span className="text-gray-700 text-xs">or</span>
+              <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber/10 border border-amber/20 text-[11px] text-amber font-medium">
+                <FlaskConical className="h-3 w-3" />
+                Sandbox Mode
+              </div>
             </div>
           </div>
         </div>
@@ -1002,7 +1164,7 @@ function Footer() {
             </div>
             <p className="text-sm text-gray-500 leading-relaxed max-w-sm">
               Composable escrow and digital asset protocol on the Stellar Network and Soroban smart
-              contract ecosystem. Built for the Stellar Community Fund.
+              contract ecosystem. No backend. No database. Built for SCF Season 23.
             </p>
             <div className="flex items-center gap-3 mt-5">
               <a href="#" className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/5 border border-white/10 text-gray-500 hover:text-white hover:bg-white/10 transition-all">
@@ -1037,9 +1199,15 @@ function Footer() {
 
         <div className="mt-8 pt-6 border-t border-white/5 flex flex-col sm:flex-row items-center justify-between gap-3">
           <p className="text-xs text-gray-700">© 2026 StellarKiosk. Open-sourced under MIT License.</p>
-          <div className="flex items-center gap-2">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald animate-pulse" />
-            <span className="text-xs text-gray-600">Stellar Testnet · Operational</span>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-1.5">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald animate-pulse" />
+              <span className="text-xs text-gray-600">Mainnet · Operational</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="h-1.5 w-1.5 rounded-full bg-cyan animate-pulse" />
+              <span className="text-xs text-gray-600">Testnet · Operational</span>
+            </div>
           </div>
         </div>
       </div>
