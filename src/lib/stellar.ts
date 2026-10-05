@@ -47,6 +47,15 @@ export async function fetchLiveAccount(address: string, network: StellarNetwork)
   }
 }
 
+export async function fundTestnetAccount(address: string): Promise<boolean> {
+  try {
+    const res = await fetch(`https://friendbot.stellar.org?addr=${encodeURIComponent(address)}`);
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 // Stellar address + transaction simulation utilities
 const CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
 

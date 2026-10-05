@@ -12,6 +12,7 @@ import {
   shortAddress,
   generateStellarAddress,
   fetchLiveAccount,
+  fundTestnetAccount,
   STELLAR_CONFIG,
   type StellarNetwork,
 } from '@/lib/stellar';
@@ -33,6 +34,7 @@ export type WalletContextType = {
   setNetwork: (n: Network) => Promise<void>;
   shortAddr: string;
   refreshAccount: () => Promise<void>;
+  fundAccount: () => Promise<boolean>;
 };
 
 const WalletContext = createContext<WalletContextType | null>(null);
@@ -174,6 +176,15 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     setNetworkState(n);
   };
 
+  const fundAccount = async (): Promise<boolean> => {
+    if (!address) return false;
+    const ok = await fundTestnetAccount(address);
+    if (ok) {
+      await refreshAccount();
+    }
+    return ok;
+  };
+
   const value: WalletContextType = {
     address,
     isConnected: !!address,
@@ -189,6 +200,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     setNetwork,
     shortAddr: address ? shortAddress(address, 4) : '',
     refreshAccount,
+    fundAccount,
   };
 
   return <WalletContext.Provider value={value}>{children}</WalletContext.Provider>;

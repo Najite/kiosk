@@ -11,6 +11,7 @@ import {
   Zap,
   ExternalLink,
   RefreshCw,
+  Coins,
 } from 'lucide-react';
 import { useWallet } from '@/context/WalletContext';
 import { shortAddress, STELLAR_CONFIG } from '@/lib/stellar';
@@ -46,10 +47,13 @@ export function TopBar({
     shortAddr,
     isSimulated,
     xlmBalance,
+    accountExists,
     refreshAccount,
+    fundAccount,
   } = useWallet();
   const [walletOpen, setWalletOpen] = useState(false);
   const [netOpen, setNetOpen] = useState(false);
+  const [funding, setFunding] = useState(false);
   const [showConnectModal, setShowConnectModal] = useState(false);
   const walletRef = useRef<HTMLDivElement>(null);
   const netRef = useRef<HTMLDivElement>(null);
@@ -191,6 +195,22 @@ export function TopBar({
                     )}
                   </div>
                 </div>
+
+                {/* Fund on Testnet button if unfunded */}
+                {!isSimulated && network === 'TESTNET' && !accountExists && (
+                  <button
+                    onClick={async () => {
+                      setFunding(true);
+                      await fundAccount();
+                      setFunding(false);
+                    }}
+                    disabled={funding}
+                    className="mt-2.5 w-full flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg bg-amber/10 border border-amber/20 text-amber text-xs font-semibold hover:bg-amber/20 transition-all disabled:opacity-50"
+                  >
+                    <Coins className="w-3.5 h-3.5" />
+                    <span>{funding ? 'Funding via Friendbot...' : 'Fund with 10,000 Testnet XLM'}</span>
+                  </button>
+                )}
 
                 {/* View on Stellar Expert */}
                 {!isSimulated && address && (
