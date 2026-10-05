@@ -142,6 +142,7 @@ export function TopBar({
           <div className="relative" ref={walletRef}>
             {isConnected ? (
               <button
+                data-testid="wallet-address-pill"
                 onClick={() => setWalletOpen(!walletOpen)}
                 className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-cyan/10 border border-cyan/20 text-xs hover:bg-cyan/15 transition-colors"
               >
