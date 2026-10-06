@@ -13,6 +13,7 @@ import {
   STELLAR_CONFIG,
   TESTNET_CONTRACT_ID,
   TESTNET_SAC_XLM,
+  getNativeSacAddress,
   type StellarNetwork,
 } from './stellar';
 
@@ -262,7 +263,7 @@ export async function buildPurchaseTx({
   buyerAddress,
   itemId,
   contractId = TESTNET_CONTRACT_ID,
-  paymentToken = TESTNET_SAC_XLM,
+  paymentToken,
   network = 'TESTNET',
 }: {
   buyerAddress: string;
@@ -271,6 +272,7 @@ export async function buildPurchaseTx({
   paymentToken?: string;
   network?: StellarNetwork;
 }): Promise<{ xdrBase64: string }> {
+  const tokenToUse = paymentToken || getNativeSacAddress(network);
   const server = getSorobanRpc(network);
   const buyerAcc = await server.getAccount(buyerAddress);
   const contract = new Contract(contractId);
@@ -284,7 +286,7 @@ export async function buildPurchaseTx({
         'purchase',
         new Address(buyerAddress).toScVal(),
         nativeToScVal(itemId, { type: 'u32' }),
-        new Address(paymentToken).toScVal()
+        new Address(tokenToUse).toScVal()
       )
     )
     .setTimeout(180)

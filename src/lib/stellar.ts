@@ -2,13 +2,25 @@ import { Horizon, Networks } from '@stellar/stellar-sdk';
 
 export type StellarNetwork = 'TESTNET' | 'MAINNET';
 
-export const TESTNET_CONTRACT_ID =
-  (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SOROBAN_CONTRACT_ID) ||
-  'CB3AQGQ6MXJVJ26ICU5CDIGSVUKS2LNCEBMZEVM2GO6RARSJ367CLQQB';
+/**
+ * Deterministic Native Stellar Asset Contract (SAC) addresses:
+ * - Testnet: CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC
+ * - Mainnet: CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EZH7JPMCXL
+ */
+export const NATIVE_SAC: Record<StellarNetwork, string> = {
+  TESTNET: 'CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC',
+  MAINNET: 'CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EZH7JPMCXL',
+};
 
-export const TESTNET_SAC_XLM =
-  (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SOROBAN_SAC_XLM) ||
-  'CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC';
+// Default featured showcase kiosk on Stellar Testnet
+export const DEFAULT_TESTNET_SHOWCASE_KIOSK = 'CB3AQGQ6MXJVJ26ICU5CDIGSVUKS2LNCEBMZEVM2GO6RARSJ367CLQQB';
+
+export function getNativeSacAddress(network: StellarNetwork = 'TESTNET'): string {
+  return NATIVE_SAC[network] || NATIVE_SAC.TESTNET;
+}
+
+export const TESTNET_CONTRACT_ID = DEFAULT_TESTNET_SHOWCASE_KIOSK;
+export const TESTNET_SAC_XLM = NATIVE_SAC.TESTNET;
 
 export const STELLAR_CONFIG = {
   TESTNET: {
@@ -19,7 +31,8 @@ export const STELLAR_CONFIG = {
     explorerTxUrl: 'https://stellar.expert/explorer/testnet/tx/',
     explorerAccountUrl: 'https://stellar.expert/explorer/testnet/account/',
     explorerContractUrl: 'https://stellar.expert/explorer/testnet/contract/',
-    contractId: TESTNET_CONTRACT_ID,
+    contractId: DEFAULT_TESTNET_SHOWCASE_KIOSK,
+    sacAddress: NATIVE_SAC.TESTNET,
   },
   MAINNET: {
     network: 'MAINNET' as StellarNetwork,
@@ -30,6 +43,7 @@ export const STELLAR_CONFIG = {
     explorerAccountUrl: 'https://stellar.expert/explorer/public/account/',
     explorerContractUrl: 'https://stellar.expert/explorer/public/contract/',
     contractId: '',
+    sacAddress: NATIVE_SAC.MAINNET,
   },
 } as const;
 
