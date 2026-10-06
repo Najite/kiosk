@@ -2,37 +2,22 @@ import { useState, useEffect, useRef } from 'react';
 import {
   Zap,
   ArrowRight,
-  Shield,
-  Code2,
   GitBranch,
   ShoppingCart,
-  Wallet,
   Check,
   Boxes,
   Store,
   ExternalLink,
   ChevronRight,
   Sparkles,
-  ArrowUpRight,
-  Sliders,
   ShieldCheck,
-  TrendingUp,
-  Tag,
-  Users,
-  Lock,
-  Layers,
-  AlertCircle,
-  Terminal,
   CheckCircle2,
   RefreshCw,
-  Copy,
-  Info,
-  DollarSign,
   Send,
   X,
 } from 'lucide-react';
 import { TESTNET_CONTRACT_ID } from '@/lib/stellar';
-import { fetchContractPolicy, fetchAllContractItems, type OnChainItem } from '@/lib/soroban';
+import { fetchAllContractItems, type OnChainItem } from '@/lib/soroban';
 import { type ViewId } from '@/components/TopBar';
 
 export function LandingPage({ onEnter }: { onEnter: (view?: ViewId) => void }) {
@@ -228,6 +213,13 @@ function LandingNav({
 
         {/* Action CTAs */}
         <div className="flex items-center gap-2.5">
+          <button
+            onClick={onOpenFeedback}
+            className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-mono text-gray-300 hover:text-white hover:bg-white/5 transition-colors border border-white/15"
+            title="Feedback & Questions"
+          >
+            <span>Feedback</span>
+          </button>
           <a
             href={`https://stellar.expert/explorer/testnet/contract/${TESTNET_CONTRACT_ID}`}
             target="_blank"
@@ -998,6 +990,16 @@ function LiveMarketplacePreview({ onEnter }: { onEnter: (view?: ViewId) => void 
     },
   ];
 
+  const displayItems =
+    items.length > 0
+      ? items.slice(0, 3).map((item) => ({
+          title: item.title,
+          desc: item.description,
+          price: `${(Number(item.price) / 10_000_000).toFixed(2)} XLM`,
+          seller: item.seller ? `${item.seller.slice(0, 4)}...${item.seller.slice(-3)}` : 'On-Chain',
+        }))
+      : sampleItems;
+
   return (
     <div className="glow-card p-8 rounded-3xl">
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-8">
@@ -1020,7 +1022,7 @@ function LiveMarketplacePreview({ onEnter }: { onEnter: (view?: ViewId) => void 
       </div>
 
       <div className="grid md:grid-cols-3 gap-6">
-        {sampleItems.map((item, idx) => (
+        {displayItems.map((item, idx) => (
           <div
             key={idx}
             className="p-5 rounded-2xl bg-black/50 border border-white/10 hover:border-cyan/40 transition-all flex flex-col justify-between"
