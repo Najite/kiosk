@@ -24,13 +24,12 @@ export type WalletContextType = {
   address: string | null;
   isConnected: boolean;
   network: Network;
+  freighterNetwork: string | null;
   isFreighterInstalled: boolean;
-  isSimulated: boolean;
   xlmBalance: string | null;
   accountExists: boolean;
   error: string | null;
   connect: () => Promise<boolean>;
-  connectSimulated: () => void;
   disconnect: () => void;
   setNetwork: (n: Network) => Promise<void>;
   shortAddr: string;
@@ -41,17 +40,31 @@ export type WalletContextType = {
 
 const WalletContext = createContext<WalletContextType | null>(null);
 
+const DISCONNECTED_KEY = 'stellarkiosk_wallet_disconnected';
+
 export function WalletProvider({ children }: { children: ReactNode }) {
   const [address, setAddress] = useState<string | null>(null);
   const [network, setNetworkState] = useState<Network>('TESTNET');
+  const [freighterNetwork, setFreighterNetwork] = useState<string | null>(null);
   const [isFreighterInstalled, setIsFreighterInstalled] = useState<boolean>(false);
-  const [isSimulated, setIsSimulated] = useState<boolean>(false);
   const [xlmBalance, setXlmBalance] = useState<string | null>(null);
   const [accountExists, setAccountExists] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
   // Sequence tracker to prevent race conditions during rapid network switching
   const querySeqRef = useRef<number>(0);
+
+  // Query Freighter's active network setting
+  const checkFreighterNetwork = useCallback(async () => {
+    try {
+      const net = await freighterGetNetworkDetails();
+      if (net && !net.error && net.network) {
+        setFreighterNetwork(net.network.toUpperCase());
+      }
+    } catch {
+      // Ignore network query error
+    }
+  }, []);
 
   // Helper to query live account status from Horizon RPC
   const refreshAccount = useCallback(async () => {
@@ -66,33 +79,23 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       setAccountExists(info.exists);
       setXlmBalance(info.xlmBalance);
     }
-  }, [address, network]);
+    await checkFreighterNetwork();
+  }, [address, network, checkFreighterNetwork]);
 
   useEffect(() => {
     refreshAccount();
   }, [refreshAccount]);
 
-  // Synchronize network with Freighter
+  // Keep network locked to TESTNET for the dedicated Testnet implementation
   const syncNetworkFromFreighter = useCallback(async () => {
-    try {
-      const details = await freighterGetNetworkDetails();
-      if (details && !details.error && details.networkPassphrase) {
-        if (details.networkPassphrase === STELLAR_CONFIG.MAINNET.passphrase) {
-          setNetworkState('MAINNET');
-        } else {
-          setNetworkState('TESTNET');
-        }
-      }
-    } catch {
-      // Fallback
-    }
-  }, []);
+    setNetworkState('TESTNET');
+    await checkFreighterNetwork();
+  }, [checkFreighterNetwork]);
 
   // Listen to live wallet changes (accounts and networks) in Freighter
   useEffect(() => {
     let watcher: WatchWalletChanges | null = null;
     let isMounted = true;
-    let lastKnownPassphrase = '';
 
     const setupFreighterWatcher = async () => {
       try {
@@ -100,21 +103,19 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         if (isMounted) setIsFreighterInstalled(!!res?.isConnected);
 
         if (res?.isConnected) {
+          await checkFreighterNetwork();
           watcher = new WatchWalletChanges(1500);
           watcher.watch((params) => {
             if (!isMounted) return;
+            // If the user explicitly disconnected, ignore background watcher updates
+            const isExplicitlyDisconnected = localStorage.getItem(DISCONNECTED_KEY) === 'true';
+            if (isExplicitlyDisconnected) {
+              return;
+            }
             if (params.address) {
               setAddress(params.address);
-              setIsSimulated(false);
             }
-            if (params.networkPassphrase && params.networkPassphrase !== lastKnownPassphrase) {
-              lastKnownPassphrase = params.networkPassphrase;
-              if (params.networkPassphrase === STELLAR_CONFIG.MAINNET.passphrase) {
-                setNetworkState('MAINNET');
-              } else {
-                setNetworkState('TESTNET');
-              }
-            }
+            checkFreighterNetwork();
           });
         }
       } catch {
@@ -128,7 +129,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       isMounted = false;
       if (watcher) watcher.stop();
     };
-  }, []);
+  }, [checkFreighterNetwork]);
 
   // Connect handler
   const connect = async (): Promise<boolean> => {
@@ -154,8 +155,9 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       }
 
       if (userAddress) {
+        // Clear disconnected flag since user explicitly connected
+        localStorage.removeItem(DISCONNECTED_KEY);
         setAddress(userAddress);
-        setIsSimulated(false);
         await syncNetworkFromFreighter();
         return true;
       } else {
@@ -168,15 +170,10 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const connectSimulated = () => {
-    setAddress(generateStellarAddress());
-    setIsSimulated(true);
-    setError(null);
-  };
-
   const disconnect = () => {
+    // Persist disconnected intent across reloads
+    localStorage.setItem(DISCONNECTED_KEY, 'true');
     setAddress(null);
-    setIsSimulated(false);
     setError(null);
     setXlmBalance(null);
     setAccountExists(false);
@@ -205,9 +202,28 @@ export function WalletProvider({ children }: { children: ReactNode }) {
 
   const signTx = async (xdrBase64: string): Promise<string | null> => {
     try {
-      if (isSimulated || !isFreighterInstalled) {
-        return xdrBase64;
+      if (!isFreighterInstalled) {
+        throw new Error('Freighter wallet extension is not installed');
       }
+
+      // Check current Freighter network to give helpful feedback before signing
+      try {
+        const netDetails = await freighterGetNetworkDetails();
+        if (netDetails?.network) {
+          const currentFreighterNet = netDetails.network.toUpperCase();
+          setFreighterNetwork(currentFreighterNet);
+          if (currentFreighterNet.includes('PUBLIC') || currentFreighterNet.includes('MAIN')) {
+            throw new Error(
+              'Your Freighter extension is set to PUBLIC / MAINNET. Please open your Freighter extension, click the network dropdown in the top-right, and switch to "Test Net" to sign this transaction.'
+            );
+          }
+        }
+      } catch (err: any) {
+        if (err.message && err.message.includes('Freighter extension is set to PUBLIC')) {
+          throw err;
+        }
+      }
+
       const signed = await freighterSignTransaction(xdrBase64, {
         networkPassphrase: STELLAR_CONFIG[network].passphrase,
       });
@@ -221,7 +237,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Freighter signing failed';
       setError(msg);
-      return null;
+      throw new Error(msg);
     }
   };
 
@@ -229,13 +245,12 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     address,
     isConnected: !!address,
     network,
+    freighterNetwork,
     isFreighterInstalled,
-    isSimulated,
     xlmBalance,
     accountExists,
     error,
     connect,
-    connectSimulated,
     disconnect,
     setNetwork,
     shortAddr: address ? shortAddress(address, 4) : '',

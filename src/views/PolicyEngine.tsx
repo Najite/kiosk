@@ -11,13 +11,14 @@ import {
   Zap,
   ScrollText,
 } from 'lucide-react';
-import { kioskStorage, type Kiosk, type KioskItem, type TransferPolicy, type UpstreamRecipient } from '@/lib/kiosk';
+import { kioskStorage, LIVE_TESTNET_OWNER, type Kiosk, type KioskItem, type TransferPolicy, type UpstreamRecipient } from '@/lib/kiosk';
 import { useWallet } from '@/context/WalletContext';
-import { bpsToPercent, formatTokenAmount, formatDuration, calculatePayouts, shortAddress } from '@/lib/stellar';
+import { bpsToPercent, formatTokenAmount, formatDuration, calculatePayouts, shortAddress, TESTNET_CONTRACT_ID } from '@/lib/stellar';
+import { buildSetPolicyTx, submitSignedTx } from '@/lib/soroban';
 import { Panel, SectionTitle, Badge, Button, Input, Label, EmptyState, StatCard } from '@/components/ui';
 
 export function PolicyEngine() {
-  const { address, isConnected, isSimulated, connect } = useWallet();
+  const { address, isConnected, connect, signTx, refreshAccount } = useWallet();
   const [kiosk, setKiosk] = useState<Kiosk | null>(null);
   const [items, setItems] = useState<KioskItem[]>([]);
   const [policies, setPolicies] = useState<Record<string, TransferPolicy>>({});
@@ -30,13 +31,13 @@ export function PolicyEngine() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const kData = await kioskStorage.getKiosk(address, isSimulated);
+    const kData = await kioskStorage.getKiosk(address);
     if (kData) {
       setKiosk(kData);
-      const itemsList = await kioskStorage.getItems(kData.id, address, isSimulated);
+      const itemsList = await kioskStorage.getItems(kData.id, address);
       setItems(itemsList);
 
-      const policyMap = await kioskStorage.getPolicies(address, isSimulated);
+      const policyMap = await kioskStorage.getPolicies(address);
       setPolicies(policyMap);
       if (itemsList.length > 0 && !selectedItemId) {
         setSelectedItemId(itemsList[0].id);
@@ -48,7 +49,7 @@ export function PolicyEngine() {
       setSelectedItemId(null);
     }
     setLoading(false);
-  }, [selectedItemId, address, isSimulated]);
+  }, [selectedItemId, address]);
 
   useEffect(() => {
     load();
@@ -100,24 +101,59 @@ export function PolicyEngine() {
     updateDraft({ upstream_recipients: recipients });
   };
 
+  const [policyError, setPolicyError] = useState<string | null>(null);
+
   const savePolicy = async () => {
     if (!draft || !selectedItemId) return;
     setSaving(true);
-    const payload = {
-      id: draft.id,
-      item_id: selectedItemId,
-      min_royalty_bps: draft.min_royalty_bps,
-      upstream_split_bps: draft.upstream_split_bps,
-      upstream_recipients: draft.upstream_recipients,
-      timelock_seconds: draft.timelock_seconds,
-      escrow_mode: draft.escrow_mode,
-    };
-    const updated = await kioskStorage.savePolicy(payload, address, isSimulated);
-    setPolicies({ ...policies, [selectedItemId]: updated });
-    setDraft(updated);
-    setSaving(false);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2500);
+    setPolicyError(null);
+
+    try {
+      // If connected as live wallet on Testnet, invoke set_policy on-chain
+      if (isConnected && address) {
+        const minFloorXlm = selectedItem ? selectedItem.price : 1;
+        const { xdrBase64 } = await buildSetPolicyTx({
+          callerAddress: address,
+          royaltyBps: draft.min_royalty_bps,
+          royaltyRecipient: address,
+          minFloorPriceInXlm: minFloorXlm,
+          upstreamSplits: (draft.upstream_recipients || []).filter(r => r.address && r.address.startsWith('G')).map(r => ({
+            recipient: r.address,
+            shareBps: r.shareBps,
+          })),
+          contractId: kiosk?.contract_id || TESTNET_CONTRACT_ID,
+        });
+
+        const signedXdr = await signTx(xdrBase64);
+        if (!signedXdr) {
+          throw new Error('Policy update signature declined in Freighter');
+        }
+
+        await submitSignedTx(signedXdr, 'TESTNET');
+        await refreshAccount();
+      }
+
+      const payload = {
+        id: draft.id,
+        item_id: selectedItemId,
+        min_royalty_bps: draft.min_royalty_bps,
+        upstream_split_bps: draft.upstream_split_bps,
+        upstream_recipients: draft.upstream_recipients,
+        timelock_seconds: draft.timelock_seconds,
+        escrow_mode: draft.escrow_mode,
+      };
+
+      const updated = await kioskStorage.savePolicy(payload, address);
+      setPolicies({ ...policies, [selectedItemId]: updated });
+      setDraft(updated);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    } catch (err: any) {
+      console.error('Failed to save policy:', err);
+      setPolicyError(err?.message || 'Failed to save policy to Soroban');
+    } finally {
+      setSaving(false);
+    }
   };
 
   if (loading) {
@@ -131,18 +167,16 @@ export function PolicyEngine() {
     );
   }
 
-  const isLive = isConnected && !isSimulated;
-
   if (items.length === 0) {
     return (
       <div className="space-y-4">
-        {isLive && (
+        {isConnected && (
           <div className="p-3.5 rounded-xl bg-emerald/5 border border-emerald/20 flex items-center justify-between text-xs text-gray-300">
             <div className="flex items-center gap-2">
               <span className="h-2 w-2 rounded-full bg-emerald animate-pulse" />
               <span>Live Wallet Connected: <strong className="font-mono text-white">{shortAddress(address || '')}</strong></span>
             </div>
-            <span className="text-[11px] font-mono text-emerald bg-emerald/10 px-2 py-0.5 rounded border border-emerald/20">Live Policy Registry</span>
+            <span className="text-[11px] font-mono text-emerald bg-emerald/10 px-2 py-0.5 rounded border border-emerald/20">Stellar Testnet</span>
           </div>
         )}
         <EmptyState
@@ -161,24 +195,24 @@ export function PolicyEngine() {
 
   return (
     <div className="space-y-5 animate-fade-in">
-      {/* Mode Banner */}
-      {!isLive ? (
-        <div className="p-3 rounded-xl bg-amber/5 border border-amber/20 flex flex-wrap items-center justify-between gap-2 text-xs">
-          <div className="flex items-center gap-2 text-amber-200">
-            <span className="h-2 w-2 rounded-full bg-amber animate-pulse" />
-            <span><strong>Sandbox Demo Mode:</strong> Reviewing protocol royalty and timelock engine test rules.</span>
+      {/* Wallet Status Banner */}
+      {!isConnected ? (
+        <div className="p-3 rounded-xl bg-cyan/5 border border-cyan/20 flex flex-wrap items-center justify-between gap-2 text-xs">
+          <div className="flex items-center gap-2 text-cyan-200">
+            <span className="h-2 w-2 rounded-full bg-cyan animate-pulse" />
+            <span>Connect your Freighter wallet on Stellar Testnet to configure on-chain escrow policies.</span>
           </div>
-          <button onClick={() => connect()} className="text-[11px] font-semibold text-amber hover:underline">
-            Connect Live Wallet &rarr;
+          <button onClick={() => connect()} className="text-[11px] font-semibold text-cyan hover:underline">
+            Connect Freighter &rarr;
           </button>
         </div>
       ) : (
         <div className="p-3 rounded-xl bg-emerald/5 border border-emerald/20 flex items-center justify-between text-xs text-emerald-200">
           <div className="flex items-center gap-2">
             <span className="h-2 w-2 rounded-full bg-emerald animate-pulse" />
-            <span><strong>Live Account Mode:</strong> Active Policy Engine for <code className="font-mono text-white">{shortAddress(address || '')}</code></span>
+            <span><strong>Connected Wallet:</strong> <code className="font-mono text-white">{shortAddress(address || '')}</code></span>
           </div>
-          <span className="text-[10px] font-mono text-emerald bg-emerald/10 px-2 py-0.5 rounded border border-emerald/20">On-Chain Mode</span>
+          <span className="text-[10px] font-mono text-emerald bg-emerald/10 px-2 py-0.5 rounded border border-emerald/20">Stellar Testnet</span>
         </div>
       )}
       {/* Stats */}
@@ -380,16 +414,27 @@ export function PolicyEngine() {
             )}
 
             {/* Save */}
-            <div className="flex items-center justify-end gap-3">
-              {saved && (
-                <span className="text-xs text-emerald flex items-center gap-1 animate-fade-in">
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald" /> Policy saved to Soroban
-                </span>
+            <div className="space-y-3">
+              {policyError && (
+                <div className="panel-tight p-3 border-rose-500/30 bg-rose-500/10 flex items-start gap-2.5">
+                  <span className="text-rose-400 font-bold text-xs mt-0.5">✕</span>
+                  <div className="text-xs text-rose-300">
+                    <p className="font-semibold">Policy Update Error</p>
+                    <p className="text-[11px] text-rose-200/80 break-words mt-0.5">{policyError}</p>
+                  </div>
+                </div>
               )}
-              <Button onClick={savePolicy} disabled={saving}>
-                <Save className="h-3.5 w-3.5" />
-                {saving ? 'Deploying...' : draft.id ? 'Update Policy' : 'Deploy Policy'}
-              </Button>
+              <div className="flex items-center justify-end gap-3">
+                {saved && (
+                  <span className="text-xs text-emerald flex items-center gap-1 animate-fade-in">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald" /> Policy saved to Soroban
+                  </span>
+                )}
+                <Button onClick={savePolicy} disabled={saving}>
+                  <Save className="h-3.5 w-3.5" />
+                  {saving ? 'Deploying...' : draft.id ? 'Update Policy' : 'Deploy Policy'}
+                </Button>
+              </div>
             </div>
           </div>
         )}

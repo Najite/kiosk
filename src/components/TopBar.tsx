@@ -17,14 +17,13 @@ import { useWallet } from '@/context/WalletContext';
 import { shortAddress, STELLAR_CONFIG } from '@/lib/stellar';
 import { ConnectModal } from '@/components/ConnectModal';
 
-export type ViewId = 'kiosk' | 'policy' | 'widget' | 'marketplace' | 'grant';
+export type ViewId = 'kiosk' | 'policy' | 'widget' | 'marketplace';
 
 const VIEWS: { id: ViewId; label: string; icon: typeof Boxes }[] = [
   { id: 'kiosk', label: 'Kiosk Manager', icon: Boxes },
   { id: 'policy', label: 'Escrow Policies', icon: Shield },
   { id: 'widget', label: 'Embed Widget', icon: Code2 },
   { id: 'marketplace', label: 'Live Marketplace', icon: Store },
-  { id: 'grant', label: 'SCF Grant Proposal', icon: FileText },
 ];
 
 export function TopBar({
@@ -40,12 +39,11 @@ export function TopBar({
     address,
     isConnected,
     connect,
-    connectSimulated,
     disconnect,
     network,
+    freighterNetwork,
     setNetwork,
     shortAddr,
-    isSimulated,
     xlmBalance,
     accountExists,
     refreshAccount,
@@ -54,6 +52,11 @@ export function TopBar({
   const [walletOpen, setWalletOpen] = useState(false);
   const [netOpen, setNetOpen] = useState(false);
   const [networkToast, setNetworkToast] = useState<string | null>(null);
+
+  const isMainnetMismatch =
+    isConnected &&
+    freighterNetwork &&
+    (freighterNetwork.includes('PUBLIC') || freighterNetwork.includes('MAIN'));
 
   const handleNetworkSelect = async (n: 'TESTNET' | 'MAINNET') => {
     setNetOpen(false);
@@ -127,39 +130,18 @@ export function TopBar({
 
         {/* Zone 3: Network + Wallet */}
         <div className="flex items-center gap-2 shrink-0">
-          {/* Network toggle */}
-          <div className="relative" ref={netRef}>
-            <button
-              onClick={() => setNetOpen(!netOpen)}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white/5 border border-white/10 text-xs hover:bg-white/10 transition-colors"
-            >
-              <span className={`h-1.5 w-1.5 rounded-full ${network === 'TESTNET' ? 'bg-amber' : 'bg-emerald'} animate-pulse`} />
-              <span className="text-gray-300 font-medium">{network}</span>
-              <ChevronDown className="h-3 w-3 text-gray-500" />
-            </button>
-            {netOpen && (
-              <div className="absolute right-0 mt-1.5 w-44 panel p-1 animate-slide-up z-50 shadow-2xl">
-                {(['TESTNET', 'MAINNET'] as const).map((n) => (
-                  <button
-                    key={n}
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleNetworkSelect(n);
-                    }}
-                    className={`w-full flex items-center justify-between px-2.5 py-2 rounded-md text-xs transition-colors ${
-                      network === n ? 'bg-white/10 text-white font-medium' : 'text-gray-400 hover:bg-white/5 hover:text-white'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className={`h-2 w-2 rounded-full ${n === 'TESTNET' ? 'bg-amber' : 'bg-emerald'}`} />
-                      <span>{n}</span>
-                    </div>
-                    {network === n && <span className="text-[10px] text-cyan font-mono">Active</span>}
-                  </button>
-                ))}
-              </div>
-            )}
+          {/* Warning badge if Freighter extension is on Mainnet */}
+          {isMainnetMismatch && (
+            <div className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-rose-500/10 border border-rose-500/30 text-xs text-rose-300 font-medium animate-pulse" title="Freighter is on Mainnet. Please switch Freighter to Testnet.">
+              <span className="h-1.5 w-1.5 rounded-full bg-rose-400" />
+              <span>Switch Freighter to Testnet</span>
+            </div>
+          )}
+
+          {/* Dedicated Testnet Badge */}
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-amber/10 border border-amber/20 text-xs font-mono">
+            <span className="h-1.5 w-1.5 rounded-full bg-amber animate-pulse" />
+            <span className="text-amber font-semibold">TESTNET</span>
           </div>
 
           {/* Wallet */}
@@ -188,36 +170,44 @@ export function TopBar({
                 <div className="flex items-center justify-between mb-1.5">
                   <p className="text-[10px] uppercase tracking-wider text-gray-500">Connected Address</p>
                   <span className={`text-[10px] px-1.5 py-0.5 rounded font-mono ${
-                    isSimulated 
-                      ? 'bg-amber/10 text-amber border border-amber/20' 
+                    isMainnetMismatch 
+                      ? 'bg-rose-500/10 text-rose-300 border border-rose-500/30' 
                       : 'bg-emerald/10 text-emerald border border-emerald/20'
                   }`}>
-                    {isSimulated ? 'Simulated' : 'Freighter'}
+                    {freighterNetwork || 'Freighter'}
                   </span>
                 </div>
                 <p className="mono text-xs text-cyan break-all leading-relaxed bg-black/40 p-2 rounded border border-white/5">{address}</p>
+
+                {/* Network mismatch warning */}
+                {isMainnetMismatch && (
+                  <div className="mt-2.5 p-2.5 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-200 text-xs leading-relaxed">
+                    <p className="font-semibold text-[11px] text-rose-300">Freighter is on Main Net</p>
+                    <p className="text-[10px] text-rose-200/80 mt-0.5">
+                      Open your Freighter browser extension and switch the top network selector to <strong>Test Net</strong>.
+                    </p>
+                  </div>
+                )}
                 
                 {/* Live Balance & Network Info */}
                 <div className="mt-2.5 p-2 rounded bg-white/3 border border-white/5 flex items-center justify-between text-xs">
                   <span className="text-gray-400">Balance:</span>
                   <div className="flex items-center gap-1.5 font-mono">
                     <span className="font-semibold text-white">
-                      {isSimulated ? '100.00 XLM' : xlmBalance !== null ? `${Number(xlmBalance).toLocaleString()} XLM` : 'Loading...'}
+                      {xlmBalance !== null ? `${Number(xlmBalance).toLocaleString()} XLM` : 'Loading...'}
                     </span>
-                    {!isSimulated && (
-                      <button 
-                        onClick={refreshAccount} 
-                        title="Refresh balance" 
-                        className="text-gray-400 hover:text-white transition-colors"
-                      >
-                        <RefreshCw className="w-3 h-3" />
-                      </button>
-                    )}
+                    <button 
+                      onClick={refreshAccount} 
+                      title="Refresh balance" 
+                      className="text-gray-400 hover:text-white transition-colors"
+                    >
+                      <RefreshCw className="w-3 h-3" />
+                    </button>
                   </div>
                 </div>
 
                 {/* Fund on Testnet button if unfunded */}
-                {!isSimulated && network === 'TESTNET' && !accountExists && (
+                {network === 'TESTNET' && !accountExists && (
                   <button
                     onClick={async () => {
                       setFunding(true);
@@ -233,7 +223,7 @@ export function TopBar({
                 )}
 
                 {/* View on Stellar Expert */}
-                {!isSimulated && address && (
+                {address && (
                   <a
                     href={`${STELLAR_CONFIG[network].explorerAccountUrl}${address}`}
                     target="_blank"
@@ -247,7 +237,7 @@ export function TopBar({
 
                 <div className="mt-3 pt-3 border-t border-white/10 flex items-center justify-between">
                   <span className="text-[11px] text-gray-400">
-                    {isSimulated ? 'Demo session' : 'Live Freighter wallet'}
+                    Live Freighter wallet
                   </span>
                   <button
                     onClick={() => {
@@ -298,10 +288,7 @@ export function TopBar({
       <ConnectModal
         isOpen={showConnectModal}
         onClose={() => setShowConnectModal(false)}
-        onContinueSimulated={() => {
-          connectSimulated();
-          setShowConnectModal(false);
-        }}
+        onRetry={handleConnectClick}
       />
     </header>
   );

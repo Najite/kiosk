@@ -2,7 +2,13 @@ import { Horizon, Networks } from '@stellar/stellar-sdk';
 
 export type StellarNetwork = 'TESTNET' | 'MAINNET';
 
-export const TESTNET_CONTRACT_ID = 'CDP5VMLME3NOXC7G3ZFRBGUMXNGIDYG7IMKBZLS4KPAZCVB6SSY4O2EG';
+export const TESTNET_CONTRACT_ID =
+  (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SOROBAN_CONTRACT_ID) ||
+  'CB3AQGQ6MXJVJ26ICU5CDIGSVUKS2LNCEBMZEVM2GO6RARSJ367CLQQB';
+
+export const TESTNET_SAC_XLM =
+  (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SOROBAN_SAC_XLM) ||
+  'CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC';
 
 export const STELLAR_CONFIG = {
   TESTNET: {
@@ -110,11 +116,7 @@ export function generateTxHash(): string {
 }
 
 export function generateContractId(): string {
-  let id = 'C';
-  for (let i = 0; i < 55; i++) {
-    id += CHARS[Math.floor(Math.random() * CHARS.length)];
-  }
-  return id;
+  return TESTNET_CONTRACT_ID;
 }
 
 export function shortAddress(addr: string, chars = 6): string {

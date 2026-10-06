@@ -16,10 +16,14 @@ import {
 import { kioskStorage, type Kiosk, type KioskItem } from '@/lib/kiosk';
 import {
   generateStellarAddress,
-  generateContractId,
   shortAddress,
   formatTokenAmount,
+  TESTNET_CONTRACT_ID,
 } from '@/lib/stellar';
+import {
+  buildPlaceAndListTx,
+  submitSignedTx,
+} from '@/lib/soroban';
 import { useWallet } from '@/context/WalletContext';
 import {
   Panel,
@@ -35,7 +39,7 @@ import {
 } from '@/components/ui';
 
 export function KioskManager() {
-  const { address, isConnected, isSimulated, connect } = useWallet();
+  const { address, isConnected, connect, signTx, refreshAccount } = useWallet();
   const [kiosk, setKiosk] = useState<Kiosk | null>(null);
   const [items, setItems] = useState<KioskItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -52,17 +56,17 @@ export function KioskManager() {
 
   const loadKiosk = useCallback(async () => {
     setLoading(true);
-    const kData = await kioskStorage.getKiosk(address, isSimulated);
+    const kData = await kioskStorage.getKiosk(address);
     if (kData) {
       setKiosk(kData);
-      const iData = await kioskStorage.getItems(kData.id, address, isSimulated);
+      const iData = await kioskStorage.getItems(kData.id, address);
       setItems(iData);
     } else {
       setKiosk(null);
       setItems([]);
     }
     setLoading(false);
-  }, [address, isSimulated]);
+  }, [address]);
 
   useEffect(() => {
     loadKiosk();
@@ -70,37 +74,80 @@ export function KioskManager() {
 
   const initializeKiosk = async (name: string, description: string, token: string) => {
     const owner = address || generateStellarAddress();
-    const contractId = generateContractId();
     const updated = await kioskStorage.updateKiosk({
       name,
       description,
       settlement_token: token,
       is_initialized: true,
       owner_address: owner,
-      contract_id: contractId,
-    }, address, isSimulated);
+      contract_id: TESTNET_CONTRACT_ID,
+    }, address);
     setKiosk(updated);
     setInitModalOpen(false);
   };
 
+  const [isAdding, setIsAdding] = useState(false);
+  const [addError, setAddError] = useState<string | null>(null);
+
   const addItem = async () => {
-    if (!kiosk || !newItem.title) return;
-    const created = await kioskStorage.addItem({
-      kiosk_id: kiosk.id,
-      title: newItem.title,
-      description: newItem.description,
-      asset_type: newItem.asset_type,
-      price: parseFloat(newItem.price) || 0,
-      icon: newItem.icon,
-      status: 'AVAILABLE',
-    }, address, isSimulated);
-    setItems([created, ...items]);
-    setNewItem({ title: '', description: '', asset_type: 'License', price: '0', icon: 'Package' });
-    setAddItemOpen(false);
+    if (!kiosk || !newItem.title || isAdding) return;
+    setIsAdding(true);
+    setAddError(null);
+
+    try {
+      const priceVal = parseFloat(newItem.price) || 0;
+
+      let onchainId: number | undefined;
+
+      if (!address || !isConnected) {
+        throw new Error('Please connect your Freighter wallet on Stellar Testnet to list assets.');
+      }
+
+      // 1. Build and simulate place_and_list transaction
+      const { xdrBase64, nextItemId } = await buildPlaceAndListTx({
+        sellerAddress: address,
+        title: newItem.title,
+        description: newItem.description,
+        assetType: newItem.asset_type,
+        priceInXlm: priceVal,
+        contractId: kiosk.contract_id || undefined,
+      });
+      onchainId = nextItemId;
+
+      // 2. Request Freighter signature
+      const signedXdr = await signTx(xdrBase64);
+      if (!signedXdr) {
+        throw new Error('Listing signature declined or failed in Freighter');
+      }
+
+      // 3. Submit transaction to Soroban RPC
+      await submitSignedTx(signedXdr, 'TESTNET');
+      await refreshAccount();
+
+      const created = await kioskStorage.addItem({
+        kiosk_id: kiosk.id,
+        onchain_id: onchainId,
+        title: newItem.title,
+        description: newItem.description,
+        asset_type: newItem.asset_type,
+        price: priceVal,
+        icon: newItem.icon,
+        status: 'AVAILABLE',
+      }, address);
+
+      setItems([created, ...items]);
+      setNewItem({ title: '', description: '', asset_type: 'License', price: '0', icon: 'Package' });
+      setAddItemOpen(false);
+    } catch (err: any) {
+      console.error('Failed to list item on-chain:', err);
+      setAddError(err?.message || 'Failed to list asset on Soroban');
+    } finally {
+      setIsAdding(false);
+    }
   };
 
   const deleteItem = async (id: string) => {
-    await kioskStorage.deleteItem(id, address, isSimulated);
+    await kioskStorage.deleteItem(id, address);
     setItems(items.filter((i) => i.id !== id));
   };
 
@@ -123,18 +170,16 @@ export function KioskManager() {
     );
   }
 
-  const isLive = isConnected && !isSimulated;
-
   if (!kiosk) {
     return (
       <div className="space-y-4 animate-fade-in">
-        {isLive && (
+        {isConnected && (
           <div className="p-3.5 rounded-xl bg-emerald/5 border border-emerald/20 flex items-center justify-between text-xs text-gray-300">
             <div className="flex items-center gap-2">
               <span className="h-2 w-2 rounded-full bg-emerald animate-pulse" />
               <span>Live Freighter Wallet Connected: <strong className="font-mono text-white">{shortAddress(address || '')}</strong></span>
             </div>
-            <span className="text-[11px] font-mono text-emerald bg-emerald/10 px-2 py-0.5 rounded border border-emerald/20">Live Account Mode</span>
+            <span className="text-[11px] font-mono text-emerald bg-emerald/10 px-2 py-0.5 rounded border border-emerald/20">Stellar Testnet</span>
           </div>
         )}
         <Panel className="p-8 text-center space-y-4">
@@ -175,16 +220,16 @@ export function KioskManager() {
 
   return (
     <div className="space-y-5 animate-fade-in">
-      {/* Mode Banner */}
-      {!isLive ? (
-        <div className="p-3 rounded-xl bg-amber/5 border border-amber/20 flex flex-wrap items-center justify-between gap-2 text-xs">
-          <div className="flex items-center gap-2 text-amber-200">
-            <span className="h-2 w-2 rounded-full bg-amber animate-pulse" />
-            <span><strong>Sandbox Demo Mode:</strong> Viewing pre-populated protocol preview. Connect your live Freighter wallet above to manage your personal on-chain kiosk.</span>
+      {/* Wallet Status Banner */}
+      {!isConnected ? (
+        <div className="p-3 rounded-xl bg-cyan/5 border border-cyan/20 flex flex-wrap items-center justify-between gap-2 text-xs">
+          <div className="flex items-center gap-2 text-cyan-200">
+            <span className="h-2 w-2 rounded-full bg-cyan animate-pulse" />
+            <span>Connect your Freighter wallet on Stellar Testnet to manage and list items on-chain.</span>
           </div>
           <button
             onClick={() => connect()}
-            className="text-[11px] font-semibold text-amber hover:underline shrink-0"
+            className="text-[11px] font-semibold text-cyan hover:underline shrink-0"
           >
             Connect Freighter &rarr;
           </button>
@@ -193,9 +238,9 @@ export function KioskManager() {
         <div className="p-3 rounded-xl bg-emerald/5 border border-emerald/20 flex items-center justify-between text-xs text-emerald-200">
           <div className="flex items-center gap-2">
             <span className="h-2 w-2 rounded-full bg-emerald animate-pulse" />
-            <span><strong>Live Account Mode:</strong> Connected to live wallet <code className="text-white font-mono">{shortAddress(address || '')}</code></span>
+            <span><strong>Connected Wallet:</strong> <code className="text-white font-mono">{shortAddress(address || '')}</code></span>
           </div>
-          <span className="text-[10px] font-mono uppercase bg-emerald/10 border border-emerald/20 px-2 py-0.5 rounded text-emerald">Decentralized</span>
+          <span className="text-[10px] font-mono uppercase bg-emerald/10 border border-emerald/20 px-2 py-0.5 rounded text-emerald">Stellar Testnet</span>
         </div>
       )}
       {/* Stats Row */}
@@ -409,11 +454,31 @@ export function KioskManager() {
               <Input type="number" value={newItem.price} onChange={(v) => setNewItem({ ...newItem, price: v })} placeholder="0" />
             </div>
           </div>
+          {/* Error state */}
+          {addError && (
+            <div className="panel-tight p-3 border-rose-500/30 bg-rose-500/10 flex items-start gap-2.5">
+              <span className="text-rose-400 font-bold text-xs mt-0.5">✕</span>
+              <div className="text-xs text-rose-300">
+                <p className="font-semibold">Listing Error</p>
+                <p className="text-[11px] text-rose-200/80 break-words mt-0.5">{addError}</p>
+              </div>
+            </div>
+          )}
+
           <div className="flex justify-end gap-2 pt-2">
-            <Button variant="ghost" onClick={() => setAddItemOpen(false)}>Cancel</Button>
-            <Button onClick={addItem} disabled={!newItem.title}>
-              <Plus className="h-3.5 w-3.5" />
-              List Asset
+            <Button variant="ghost" onClick={() => setAddItemOpen(false)} disabled={isAdding}>Cancel</Button>
+            <Button onClick={addItem} disabled={!newItem.title || isAdding}>
+              {isAdding ? (
+                <>
+                  <div className="h-3.5 w-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  Submitting to Soroban...
+                </>
+              ) : (
+                <>
+                  <Plus className="h-3.5 w-3.5" />
+                  List Asset On-Chain
+                </>
+              )}
             </Button>
           </div>
         </div>

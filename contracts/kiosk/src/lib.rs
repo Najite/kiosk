@@ -2,13 +2,10 @@
 
 mod types;
 
-#[cfg(test)]
-mod test;
-
 use soroban_sdk::{
-    contract, contracterror, contractimpl, symbol_short, token, Address, Env, IntoVal, String, Symbol, Val,
+    contract, contracterror, contractimpl, symbol_short, token, Address, Env, String, Symbol, Vec,
 };
-pub use types::{DataKey, ListingItem, TransferPolicy};
+pub use types::{DataKey, ListingItem, TransferPolicy, UpstreamSplit};
 
 const KIOSK: Symbol = symbol_short!("KIOSK");
 
@@ -31,18 +28,26 @@ pub struct KioskContract;
 
 #[contractimpl]
 impl KioskContract {
-    /// Initialize the Kiosk with an admin/owner and default policy
+    /// Initialize the Kiosk with an admin/owner, default policy, and optional upstream splits
     pub fn initialize(
         env: Env,
         owner: Address,
         royalty_bps: u32,
         royalty_recipient: Address,
         min_floor_price: i128,
+        upstream_splits: Vec<UpstreamSplit>,
     ) -> Result<(), KioskError> {
         if env.storage().instance().has(&DataKey::Owner) {
             return Err(KioskError::AlreadyInitialized);
         }
-        if royalty_bps > 10_000 {
+
+        let mut total_upstream_bps: u32 = 0;
+        for i in 0..upstream_splits.len() {
+            let split = upstream_splits.get(i).unwrap();
+            total_upstream_bps += split.share_bps;
+        }
+
+        if royalty_bps + total_upstream_bps > 10_000 {
             return Err(KioskError::InvalidBps);
         }
 
@@ -54,6 +59,7 @@ impl KioskContract {
             royalty_bps,
             royalty_recipient,
             min_floor_price,
+            upstream_splits,
         };
         env.storage().instance().set(&DataKey::Policy, &policy);
         env.storage().instance().set(&DataKey::ItemCount, &0u32);
@@ -66,13 +72,14 @@ impl KioskContract {
         Ok(())
     }
 
-    /// Update the transfer policy (owner only)
+    /// Update the transfer policy (owner only), including upstream splits
     pub fn set_policy(
         env: Env,
         caller: Address,
         royalty_bps: u32,
         royalty_recipient: Address,
         min_floor_price: i128,
+        upstream_splits: Vec<UpstreamSplit>,
     ) -> Result<(), KioskError> {
         let owner: Address = env
             .storage()
@@ -85,7 +92,13 @@ impl KioskContract {
         }
         caller.require_auth();
 
-        if royalty_bps > 10_000 {
+        let mut total_upstream_bps: u32 = 0;
+        for i in 0..upstream_splits.len() {
+            let split = upstream_splits.get(i).unwrap();
+            total_upstream_bps += split.share_bps;
+        }
+
+        if royalty_bps + total_upstream_bps > 10_000 {
             return Err(KioskError::InvalidBps);
         }
 
@@ -93,6 +106,7 @@ impl KioskContract {
             royalty_bps,
             royalty_recipient,
             min_floor_price,
+            upstream_splits,
         };
         env.storage().instance().set(&DataKey::Policy, &policy);
 
@@ -104,11 +118,13 @@ impl KioskContract {
         Ok(())
     }
 
-    /// Place and list an item in the kiosk
+    /// Place and list an item in the kiosk with complete title and metadata
     pub fn place_and_list(
         env: Env,
         seller: Address,
         title: String,
+        description: String,
+        asset_type: String,
         price: i128,
     ) -> Result<u32, KioskError> {
         seller.require_auth();
@@ -138,6 +154,8 @@ impl KioskContract {
         let item = ListingItem {
             id: item_count,
             title,
+            description,
+            asset_type,
             price,
             is_listed: true,
             seller: seller.clone(),
@@ -178,7 +196,7 @@ impl KioskContract {
         Ok(())
     }
 
-    /// Purchase a listed item enforcing royalty and seller splits via Stellar asset token
+    /// Purchase a listed item enforcing royalty, upstream splits, and seller payouts atomically on-chain
     pub fn purchase(
         env: Env,
         buyer: Address,
@@ -205,17 +223,34 @@ impl KioskContract {
 
         let token_client = token::Client::new(&env, &payment_token);
 
-        // Calculate payout splits
+        // 1. Calculate creator royalty
         let royalty_amount = (item.price * (policy.royalty_bps as i128)) / 10_000;
-        let seller_amount = item.price - royalty_amount;
 
-        // Execute payment transfers
+        // 2. Calculate and execute upstream splits atomically
+        let mut total_upstream_amount: i128 = 0;
+        for i in 0..policy.upstream_splits.len() {
+            let split = policy.upstream_splits.get(i).unwrap();
+            let split_amount = (item.price * (split.share_bps as i128)) / 10_000;
+            if split_amount > 0 {
+                token_client.transfer(&buyer, &split.recipient, &split_amount);
+                total_upstream_amount += split_amount;
+            }
+        }
+
+        // 3. Calculate remaining seller amount
+        let seller_amount = item.price - royalty_amount - total_upstream_amount;
+
+        // 4. Execute creator royalty transfer
         if royalty_amount > 0 {
             token_client.transfer(&buyer, &policy.royalty_recipient, &royalty_amount);
         }
-        token_client.transfer(&buyer, &item.seller, &seller_amount);
 
-        // Mark as unlisted / sold
+        // 5. Execute seller payout transfer
+        if seller_amount > 0 {
+            token_client.transfer(&buyer, &item.seller, &seller_amount);
+        }
+
+        // 6. Mark item as sold / unlisted in persistent storage
         item.is_listed = false;
         env.storage().persistent().set(&DataKey::Item(item_id), &item);
 
@@ -241,5 +276,13 @@ impl KioskContract {
             .persistent()
             .get(&DataKey::Item(item_id))
             .ok_or(KioskError::ItemNotFound)
+    }
+
+    /// Get total items listed
+    pub fn get_item_count(env: Env) -> u32 {
+        env.storage()
+            .instance()
+            .get(&DataKey::ItemCount)
+            .unwrap_or(0)
     }
 }

@@ -17,7 +17,7 @@ import { formatTokenAmount, shortAddress } from '@/lib/stellar';
 import { Panel, SectionTitle, Badge, Button, Input, Label, Toggle } from '@/components/ui';
 
 export function WidgetCustomizer() {
-  const { address, isConnected, isSimulated, connect } = useWallet();
+  const { address, isConnected, connect } = useWallet();
   const [kiosk, setKiosk] = useState<Kiosk | null>(null);
   const [items, setItems] = useState<KioskItem[]>([]);
   const [config, setConfig] = useState<WidgetConfig | null>(null);
@@ -29,24 +29,24 @@ export function WidgetCustomizer() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const kData = await kioskStorage.getKiosk(address, isSimulated);
+    const kData = await kioskStorage.getKiosk(address);
     if (kData) {
       setKiosk(kData);
-      const itemsList = await kioskStorage.getItems(kData.id, address, isSimulated);
+      const itemsList = await kioskStorage.getItems(kData.id, address);
       setItems(itemsList);
       if (itemsList.length > 0) setPreviewItem(itemsList[0]);
 
-      const wData = await kioskStorage.getWidgetConfig(kData.id, address, isSimulated);
+      const wData = await kioskStorage.getWidgetConfig(kData.id, address);
       setConfig(wData);
     } else {
       setKiosk(null);
       setItems([]);
       setPreviewItem(null);
-      const wData = await kioskStorage.getWidgetConfig('', address, isSimulated);
+      const wData = await kioskStorage.getWidgetConfig('', address);
       setConfig(wData);
     }
     setLoading(false);
-  }, [address, isSimulated]);
+  }, [address]);
 
   useEffect(() => {
     load();
@@ -54,7 +54,7 @@ export function WidgetCustomizer() {
 
   const updateConfig = async (patch: Partial<WidgetConfig>) => {
     if (!config) return;
-    const updated = await kioskStorage.updateWidgetConfig({ ...patch, kiosk_id: kiosk?.id }, address, isSimulated);
+    const updated = await kioskStorage.updateWidgetConfig({ ...patch, kiosk_id: kiosk?.id }, address);
     setConfig(updated);
   };
 
@@ -121,28 +121,26 @@ export default function DocsPage() {
     );
   }
 
-  const isLive = isConnected && !isSimulated;
-
   return (
     <div className="space-y-5 animate-fade-in">
-      {/* Mode Banner */}
-      {!isLive ? (
-        <div className="p-3 rounded-xl bg-amber/5 border border-amber/20 flex flex-wrap items-center justify-between gap-2 text-xs">
-          <div className="flex items-center gap-2 text-amber-200">
-            <span className="h-2 w-2 rounded-full bg-amber animate-pulse" />
-            <span><strong>Sandbox Demo Mode:</strong> Generating embeddable widgets with preview contract parameters.</span>
+      {/* Wallet Status Banner */}
+      {!isConnected ? (
+        <div className="p-3 rounded-xl bg-cyan/5 border border-cyan/20 flex flex-wrap items-center justify-between gap-2 text-xs">
+          <div className="flex items-center gap-2 text-cyan-200">
+            <span className="h-2 w-2 rounded-full bg-cyan animate-pulse" />
+            <span>Connect your Freighter wallet on Stellar Testnet to generate embed codes for your escrow kiosks.</span>
           </div>
-          <button onClick={() => connect()} className="text-[11px] font-semibold text-amber hover:underline">
-            Connect Live Wallet &rarr;
+          <button onClick={() => connect()} className="text-[11px] font-semibold text-cyan hover:underline shrink-0">
+            Connect Freighter &rarr;
           </button>
         </div>
       ) : (
         <div className="p-3 rounded-xl bg-emerald/5 border border-emerald/20 flex items-center justify-between text-xs text-emerald-200">
           <div className="flex items-center gap-2">
             <span className="h-2 w-2 rounded-full bg-emerald animate-pulse" />
-            <span><strong>Live Account Mode:</strong> Generating embed codes for <code className="font-mono text-white">{shortAddress(address || '')}</code></span>
+            <span><strong>Connected Wallet:</strong> <code className="font-mono text-white">{shortAddress(address || '')}</code></span>
           </div>
-          <span className="text-[10px] font-mono text-emerald bg-emerald/10 px-2 py-0.5 rounded border border-emerald/20">Production Ready</span>
+          <span className="text-[10px] font-mono text-emerald bg-emerald/10 px-2 py-0.5 rounded border border-emerald/20">Stellar Testnet</span>
         </div>
       )}
 

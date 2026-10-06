@@ -3,156 +3,171 @@
 > A composable, non-custodial digital asset kiosk and policy engine for the Stellar & Soroban ecosystem.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-[![Network](https://img.shields.io/badge/Network-Stellar%20Testnet%20%26%20Mainnet-green.svg)](https://stellar.org)
+[![Network](https://img.shields.io/badge/Network-Stellar%20Testnet-green.svg)](https://stellar.org)
 [![Contracts](https://img.shields.io/badge/Smart%20Contracts-Soroban%20v21-purple.svg)](https://soroban.stellar.org)
-[![Architecture](https://img.shields.io/badge/Architecture-100%25%20Decentralized%20(Zero%20DB)-emerald.svg)](https://soroban.stellar.org)
-[![Wave Program](https://img.shields.io/badge/Drips%20Wave-Eligible%20Sprint-blueviolet.svg)](https://www.drips.network/wave)
+[![Settlement](https://img.shields.io/badge/Settlement-Atomic%20On--Chain%20Escrow-cyan.svg)](https://soroban.stellar.org)
+[![Architecture](https://img.shields.io/badge/Architecture-100%25%20Decentralized-emerald.svg)](https://stellar.expert)
 
 ---
 
 ## 📌 Executive Summary
 
-Traditional Web3 asset commerce forces creators and developers into a custody trap: to list, sell, or trade an asset, you must transfer custody to a third-party marketplace contract.
+Traditional Web3 commerce models force creators and developers into a custody compromise: to list or sell an asset, you must transfer custody to a third-party marketplace contract. If the marketplace is paused, compromised, or enforces zero royalties, creators lose both sovereignty and revenue.
 
-**StellarKiosk** brings the **Kiosk Commerce Primitive** to Stellar and Soroban. Assets remain in a non-custodial vault, governed by modular on-chain **Transfer Policies** (guaranteed creator royalties, minimum floor prices, timelocks, and identity/allowlist rules) that execute atomically on settlement.
+**StellarKiosk** brings the **Kiosk Commerce Primitive** to Stellar and Soroban. Assets remain protected in a non-custodial kiosk vault, governed by modular on-chain **Transfer Policies** (guaranteed creator royalties, multi-recipient upstream revenue splits, floor prices, and timelocked escrows). When a purchase occurs, the Soroban smart contract atomically splits payments across the seller, creator, and upstream protocol treasuries in a single ledger transaction.
 
-The project is built as a **100% decentralized Web3 protocol** with **zero centralized databases** (no Supabase, Firebase, or external API keys). The blockchain ledger and Soroban state are the single source of truth.
+The project runs as a **100% decentralized Web3 protocol** on Stellar Testnet with **zero centralized backends or databases** (no Supabase, Firebase, or external API keys). The Stellar ledger and Soroban instance storage serve as the single source of truth.
 
 ---
 
-## 🎯 What the Project Includes
+## 🌐 Live On-Chain Testnet Deployment
 
-### 1. 🏠 Interactive Landing Page & Product Showcase
-* **Hero Section & Value Proposition:** Explains the non-custodial kiosk primitive vs. traditional marketplace custody risks.
-* **Interactive Protocol Architecture Diagram:** Visualizes the flow between Buyer, Seller, Kiosk Vault, Transfer Policy Engine, and Soroban Settlement.
-* **Feature Deep-Dives:** Details atomic royalty settlement, programmable splits, timelocked escrows, and embeddable widgets.
-* **Live Interactive Widget Demo:** Demonstrates instant simulated and on-chain checkouts directly on the landing page.
+| Parameter | Value |
+| :--- | :--- |
+| **Network** | Stellar Testnet (`Passphrase: Test SDF Network ; September 2015`) |
+| **Kiosk Contract ID** | [`CB3AQGQ6MXJVJ26ICU5CDIGSVUKS2LNCEBMZEVM2GO6RARSJ367CLQQB`](https://stellar.expert/explorer/testnet/contract/CB3AQGQ6MXJVJ26ICU5CDIGSVUKS2LNCEBMZEVM2GO6RARSJ367CLQQB) |
+| **WASM Hash** | `b6b584e187732e5d66807bc993d0c15feae17e22d33bd100897735ad70a9585a` |
+| **Native SAC (XLM)** | [`CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC`](https://stellar.expert/explorer/testnet/contract/CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC) |
+| **Protocol Treasury** | `GD54GYI3SRVER7O56DLEXZEXQ2UJVXIOOXZYVV5ITCZ4MOEJ3XFLXNVO` |
+| **Soroban RPC Endpoint** | `https://soroban-testnet.stellar.org` |
+| **Horizon RPC Endpoint** | `https://horizon-testnet.stellar.org` |
 
-### 2. 🏛️ Kiosk Maintainer Dashboard (`KioskManager`)
-* **Account-Isolated Kiosk State:** Every connected Stellar wallet manages its own isolated Soroban Kiosk instance.
-* **Live Empty-State & Initialization:** If an account is new, it presents an honest empty state with a one-click **"Initialize Soroban Kiosk"** modal allowing the user to configure:
-  * Kiosk Name & Description
-  * Settlement Asset (`Native XLM` or `Stellar USDC`)
-* **Asset Vault & Listings:**
-  * Add digital assets (Developer Passes, API Licenses, Collectibles, Badges).
-  * Assign prices, icons, and real-time statuses (`AVAILABLE`, `IN_ESCROW`, `SETTLED`).
-  * Instant delisting / removal controls.
-* **Live Analytics & Contract Badges:** Displays Total Sales Volume, Stored Asset Count, Contract UID, and Deployment status.
+---
+
+## 🏛️ Core Protocol Architecture
+
+```
+                    ┌────────────────────────┐
+                    │     Freighter Wallet   │
+                    └───────────┬────────────┘
+                                │ Signs Transaction
+                                ▼
+┌─────────────────────────────────────────────────────────────────┐
+│               Soroban Smart Contract (KioskContract)            │
+│                 CB3AQGQ6...367CLQQB (Testnet)                   │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  1. Buyer Authorization: buyer.require_auth()                   │
+│  2. Policy Validation: floor price & listed status checks       │
+│  3. Atomic Payment Distribution via Stellar Asset Contract:     │
+│     ├── Net Payout (90%)      ───► Seller                       │
+│     ├── Creator Royalty (7.5%) ──► Royalty Recipient            │
+│     └── Upstream Split (2.5%) ───► Protocol Treasury            │
+│  4. State Transition: item.is_listed = false                    │
+│  5. Event Emitted: (KIOSK, "bought", [item_id, buyer, price])   │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 🎯 Features & Modules
+
+### 1. 🏠 Interactive Landing Page
+* **Value Proposition:** Interactive comparison between traditional custody vs. the non-custodial Kiosk standard.
+* **Architecture Flowchart:** Dynamic step-by-step visualization of buyer, seller, policy engine, and atomic settlement.
+* **Interactive Checkout Sandbox:** Live checkout preview allowing users to inspect split calculations before buying.
+
+### 2. 🏛️ Kiosk Manager (`KioskManager`)
+* **Non-Custodial Vault:** Mint, list, or delist digital assets (Developer Passes, API Licenses, Badges, Collectibles).
+* **On-Chain Listing:** Automatically calls `place_and_list` on Soroban with asset metadata (title, description, asset type, price).
+* **Real-time Status Tracking:** Track asset status (`AVAILABLE`, `IN_ESCROW`, `SETTLED`).
 
 ### 3. 🛡️ Transfer Policy Engine (`PolicyEngine`)
-* **Granular Royalty Enforcement:** Configure minimum royalty percentages (in basis points, e.g., `500 bps = 5.0%`).
-* **Multi-Recipient Upstream Splits:** Split secondary sale royalties across multiple addresses (e.g., Protocol Treasury, Community Funds, DAO addresses).
-* **Escrow Modes & Timelocks:**
-  * `INSTANT`: Atomic ledger settlement upon buyer signature.
-  * `TIMELOCKED`: Enforces a configurable escrow delay (e.g., 24 hours) with dispute buffer.
-* **Live Fee Calculator:** Real-time preview of Seller Payout, Creator Royalty, and Upstream Splits before saving on-chain.
+* **Creator Royalty Enforcement:** Set minimum royalty percentages in basis points (e.g., `750 bps = 7.5%`).
+* **Multi-Recipient Upstream Splits:** Configure atomic payouts for protocol treasuries, ecosystem DAOs, or affiliate partners (e.g., `250 bps = 2.5%`).
+* **Floor Price Enforcement:** Prevents listing or purchasing below the minimum threshold on-chain.
+* **Escrow Modes:** Supports `INSTANT` atomic settlements and `TIMELOCKED` dispute periods.
 
-### 4. 🛒 Soroban Escrow Marketplace (`Marketplace`)
-* **Catalog Browsing:** Filter and view all active listings stored in the kiosk vault.
-* **Multi-Step Escrow Checkout Modal:**
-  1. *Review Stage:* Item price, creator royalty breakdown, and upstream recipient verification.
-  2. *Signing Stage:* Freighter signature simulation/prompt.
-  3. *Settling Stage:* Atomic Soroban settlement and token transfer.
-  4. *Done Stage:* Transaction receipt with generated Soroban transaction hash and explorer links.
-* **Double-Click & Race Condition Protected:** Synchronous execution guards prevent duplicate purchases or double deductions.
+### 4. 🛒 Live Soroban Marketplace (`Marketplace`)
+* **Live Catalog:** Fetches active listings directly from the deployed Soroban contract.
+* **Multi-Step Atomic Checkout:**
+  1. **Review:** Inspect price breakdown, seller payout, royalty fee, and upstream splits.
+  2. **Sign:** Request transaction signature from Freighter.
+  3. **Settle:** Submit atomic transaction envelope to Soroban Testnet RPC.
+  4. **Receipt:** View real-time settlement status with direct clickable links to [StellarExpert Explorer](https://stellar.expert).
+* **Zero Hardcoded Accounts:** Reads wallet addresses dynamically from the connected Freighter session.
 
-### 5. 🧩 Embeddable Checkout Widget Configurator (`WidgetCustomizer`)
-* **WYSIWYG Widget Builder:**
-  * Dark & Light theme toggles.
-  * Custom hex accent color picker.
-  * Configurable button labels, border radius, and preview cards.
-* **Multi-Platform Code Export:**
-  * **React Component:** `@stellarkiosk/widget` drop-in code snippet.
-  * **HTML Web Component:** `<stellar-kiosk-button>` standalone script.
-  * **Iframe Embed:** Responsive cross-origin embed code.
+### 5. 🧩 Embeddable Checkout Widget (`WidgetCustomizer`)
+* **Customizer Interface:** Live preview with custom dark/light themes, accent colors, and custom button text.
+* **Drop-in Embed Code:** Generates copy-paste code for:
+  * **React Component:** `@stellarkiosk/widget`
+  * **HTML Web Component:** `<stellar-kiosk-button>`
+  * **Iframe Embed:** Standalone hosted iframe snippet.
 
-### 6. 💼 Stellar Community Fund (SCF) Proposal View (`GrantProposal`)
-* Full formatted grant application export for **Stellar Community Fund / Drips Wave**:
-  * Project Overview, Problem Statement, and Solution Architecture.
-  * Technical Milestones (Soroban Contracts, Dashboard, SDK, Documentation).
-  * Budget breakdown with detailed category percentages.
-  * One-click **"Export Full Proposal"** to clipboard for grant submission.
-
-### 7. 👛 Freighter Wallet & Network Management (`TopBar`)
-* **Freighter API Integration:** Connects seamlessly to `@stellar/freighter-api`.
-* **Live Horizon RPC Sync:** Real-time query to Stellar Horizon for public key existence, sequence numbers, and live XLM balances.
-* **Testnet & Mainnet Switcher:**
-  * One-click network switcher dropdown.
-  * Sequence-guarded async fetch prevents out-of-order race conditions.
-  * Gracefully handles unfunded accounts without throwing red 404 errors in DevTools.
-  * Bottom-right floating toast notification provides immediate feedback during network transitions.
-* **Testnet Faucet Funding:** Automatic detection of unfunded testnet accounts with a one-click **"Fund with 10,000 Testnet XLM via Friendbot"** button.
-* **Simulated Sandbox Fallback:** Reviewers without the Freighter extension can click **"Continue with Simulated Demo Account"** to test the entire suite instantly.
-
-### 8. 🦀 Rust Soroban Smart Contracts (`contracts/kiosk`)
-* **Live Testnet Contract:** [`CDP5VMLME3NOXC7G3ZFRBGUMXNGIDYG7IMKBZLS4KPAZCVB6SSY4O2EG`](https://stellar.expert/explorer/testnet/contract/CDP5VMLME3NOXC7G3ZFRBGUMXNGIDYG7IMKBZLS4KPAZCVB6SSY4O2EG)
-* **Contract Admin / Deployer:** `GBOLOWBCVE2AZ3XTFKQURYTSLZHTXA2IM7JSKIYOJB37XVTDPJTAEB5X`
-* **Initialization Tx:** [`de9de343e30af1fdb7d2d08e2edf1ddd887faa137ca31f164a45f6c12a7cb6ed`](https://stellar.expert/explorer/testnet/tx/de9de343e30af1fdb7d2d08e2edf1ddd887faa137ca31f164a45f6c12a7cb6ed)
-* **On-Chain Listing Tx:** [`9ea828c0f151913665dcbec160da0bff12c7a7d7476f9d7f5120e912efa01702`](https://stellar.expert/explorer/testnet/tx/9ea828c0f151913665dcbec160da0bff12c7a7d7476f9d7f5120e912efa01702)
-* **`initialize`:** Sets owner address, default royalty basis points, royalty recipient, and floor price.
-* **`set_policy`:** Updates policy rules with `caller.require_auth()` owner protection.
-* **`place_and_list`:** Places an asset in persistent storage, validates floor price, and publishes a `(KIOSK, "listed")` event.
-* **`delist`:** Seller-authorized delisting.
-* **`purchase`:** Atomically transfers payment token from buyer to seller and royalty recipient using Soroban `token::Client`, marks item unlisted, and emits `(KIOSK, "bought")`.
+### 6. 💼 Grant Proposal & Roadmap (`GrantProposal`)
+* Complete formatted grant proposal for **Stellar Community Fund (SCF) / Drips Wave**:
+  * Problem statement, architecture, milestones, deliverables, and budget distribution.
+  * One-click clipboard export for ecosystem submission.
 
 ---
 
-## 🛠️ Tech Stack & Dependencies
+## 🦀 Soroban Smart Contract Reference (`contracts/kiosk`)
 
-| Layer | Technologies |
-| :--- | :--- |
-| **Smart Contracts** | Rust, Soroban SDK (`soroban-sdk 21.7.7`), WebAssembly (`wasm32v1-none`), Stellar CLI 27.0 |
-| **Deployed Testnet Contract** | [`CDP5VMLME3NOXC7G3ZFRBGUMXNGIDYG7IMKBZLS4KPAZCVB6SSY4O2EG`](https://stellar.expert/explorer/testnet/contract/CDP5VMLME3NOXC7G3ZFRBGUMXNGIDYG7IMKBZLS4KPAZCVB6SSY4O2EG) |
-| **Frontend Framework** | React 18, TypeScript, Vite, Tailwind CSS |
-| **Stellar SDKs** | `@stellar/stellar-sdk` (v17.2.1), `@stellar/freighter-api` (v6.0.1) |
-| **UI & Icons** | Lucide React Icons, Glassmorphism UI Token System |
-| **Testing** | Vitest (v2.1.8), `@testing-library/react`, `jsdom` |
-| **Protocol Storage** | Pure decentralized ledger & Horizon/Soroban RPC client (`src/lib/soroban.ts`, `src/lib/kiosk.ts`) |
+The Rust smart contract implements the following entry points:
 
----
+```rust
+// Initialize kiosk with owner, royalty policy, and upstream split recipients
+pub fn initialize(
+    env: Env,
+    owner: Address,
+    royalty_bps: u32,
+    royalty_recipient: Address,
+    min_floor_price: i128,
+    upstream_splits: Vec<UpstreamSplit>,
+) -> Result<(), KioskError>;
 
-## 📂 Complete Project Structure
+// Update transfer policy with caller authentication
+pub fn set_policy(
+    env: Env,
+    caller: Address,
+    royalty_bps: u32,
+    royalty_recipient: Address,
+    min_floor_price: i128,
+    upstream_splits: Vec<UpstreamSplit>,
+) -> Result<(), KioskError>;
 
-```text
-kiosk/
-├── contracts/
-│   └── kiosk/               # Soroban Smart Contract (Rust)
-│       ├── Cargo.toml
-│       └── src/
-│           ├── lib.rs       # Contract methods (initialize, list, purchase, delist, policy)
-│           ├── types.rs     # Data structures (ListingItem, TransferPolicy, DataKey)
-│           └── test.rs      # Soroban unit test suite
-├── Cargo.toml               # Cargo workspace root
-├── src/
-│   ├── components/
-│   │   ├── ConnectModal.tsx # Freighter detection & Simulated account selector
-│   │   ├── TopBar.tsx       # Navigation, Network toggle, Live wallet dropdown & toasts
-│   │   └── ui.tsx           # Glassmorphism design system (Panel, StatCard, Badge, Button, Modal, Input)
-│   ├── context/
-│   │   └── WalletContext.tsx # Centralized wallet, Freighter listeners, Horizon RPC & sequence guards
-│   ├── lib/
-│   │   ├── kiosk.ts         # Account-isolated protocol client (kiosks, items, policies, widgets, txs)
-│   │   └── stellar.ts       # Horizon server endpoints, Friendbot faucet, payout math & helpers
-│   ├── test/
-│   │   ├── setup.ts         # Vitest environment & Freighter API mocks
-│   │   └── WalletFlow.test.tsx # Integration tests for wallet connection and network toggle
-│   ├── views/
-│   │   ├── GrantProposal.tsx # SCF Season 23 proposal export viewer
-│   │   ├── KioskManager.tsx  # Maintainer vault, asset listing & contract init
-│   │   ├── LandingPage.tsx   # Product landing page, interactive protocol diagrams & demos
-│   │   ├── Marketplace.tsx   # Multi-step escrow checkout & transaction ledger
-│   │   ├── PolicyEngine.tsx  # Royalty split builder, upstream recipients & timelock modes
-│   │   └── WidgetCustomizer.tsx # Embeddable button configurator with React/HTML/iframe export
-│   ├── App.tsx              # Main application router (Landing vs. Dashboard views)
-│   ├── index.css            # Custom theme styles, scanlines, animations & fonts
-│   └── main.tsx             # React DOM entry point
-├── .github/
-│   └── ISSUES.md            # 800+ lines of contributor issues tagged by difficulty & sprint
-├── dist/                    # Production build output
-├── package.json             # NPM dependencies and scripts
-├── tailwind.config.js       # Curated Web3 palette (obsidian, cyan, emerald, amber, rose)
-└── vite.config.ts           # Vite build configuration with path aliases
+// Place and list asset into persistent storage with metadata
+pub fn place_and_list(
+    env: Env,
+    seller: Address,
+    title: String,
+    description: String,
+    asset_type: String,
+    price: i128,
+) -> Result<u32, KioskError>;
+
+// Delist an item (requires seller auth)
+pub fn delist(env: Env, caller: Address, item_id: u32) -> Result<(), KioskError>;
+
+// Atomically execute purchase, payouts, royalties, and upstream splits
+pub fn purchase(
+    env: Env,
+    buyer: Address,
+    item_id: u32,
+    payment_token: Address,
+) -> Result<(), KioskError>;
+
+// Read-only getters
+pub fn get_policy(env: Env) -> Result<TransferPolicy, KioskError>;
+pub fn get_item(env: Env, item_id: u32) -> Result<ListingItem, KioskError>;
+pub fn get_item_count(env: Env) -> u32;
+pub fn get_owner(env: Env) -> Result<Address, KioskError>;
 ```
+
+---
+
+## 🛠️ Tech Stack & Tooling
+
+| Component | Technology | Version |
+| :--- | :--- | :--- |
+| **Smart Contract** | Rust (`soroban-sdk`) | `21.7.7` |
+| **Target Architecture** | WebAssembly | `wasm32v1-none` |
+| **Frontend Framework** | React + TypeScript + Vite | `18.3.1` / `5.4.2` |
+| **Styling** | Tailwind CSS + Lucide Icons | `3.4.1` |
+| **Stellar SDK** | `@stellar/stellar-sdk` | `17.2.1` |
+| **Wallet Connector** | `@stellar/freighter-api` | `6.0.1` |
+| **Unit & Integration Tests**| Vitest + Testing Library | `2.1.8` |
 
 ---
 
@@ -161,38 +176,52 @@ kiosk/
 ### Prerequisites
 - **Node.js**: `v18.x` or later
 - **npm** or **pnpm**
-- *(Optional for Soroban development)*: **Rust** with `wasm32-unknown-unknown` target and `soroban-cli`
+- **Freighter Wallet Extension** configured to **Testnet**
+- *(Optional for contract development)*: **Rust** with `wasm32-unknown-unknown` and `stellar-cli`
 
-### 1. Run the Frontend Locally
+### 1. Clone & Configure Environment
 
 ```bash
-# Clone the repository
 git clone https://github.com/Najite/kiosk.git
 cd kiosk
 
+# Configure environment variables (.env)
+cp .env.example .env # or verify .env exists:
+```
+
+Ensure `.env` contains:
+```env
+VITE_STELLAR_NETWORK=TESTNET
+VITE_SOROBAN_CONTRACT_ID=CB3AQGQ6MXJVJ26ICU5CDIGSVUKS2LNCEBMZEVM2GO6RARSJ367CLQQB
+VITE_SOROBAN_SAC_XLM=CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC
+```
+
+### 2. Run the Frontend
+
+```bash
 # Install dependencies
 npm install
 
-# Start development server
+# Start Vite development server
 npm run dev
 ```
 
 Open [http://localhost:5173](http://localhost:5173) in your browser.
 
-### 2. Run Tests & Validation
+### 3. Build & Test
 
 ```bash
-# Run Vitest test suite
-npx vitest run
+# Run frontend test suite
+npm run test
 
-# Validate TypeScript & build production bundle
+# Typecheck and build production bundle
 npm run build
 ```
 
-### 3. Build & Test Soroban Contracts
+### 4. Build Soroban Smart Contracts (Rust)
 
 ```bash
-# Compile Soroban contracts to WebAssembly
+# Compile contract WASM
 cargo build --target wasm32-unknown-unknown --release
 
 # Run Rust unit tests
@@ -201,15 +230,15 @@ cargo test -p kiosk
 
 ---
 
-## 🔒 Security & Decentralization Commitments
+## 🔒 Security & Verification Guarantees
 
-1. **Non-Custodial Design:** Items remain tied to the creator's kiosk until the exact atomic criteria specified by the `TransferPolicy` are satisfied.
-2. **Zero Centralized Storage:** There are no backend API servers, centralized relational databases, or administrative custody keys.
-3. **Graceful Network Handling:** Unfunded accounts on Mainnet or Testnet are handled with clean Horizon RPC logic without console errors or unhandled promises.
-4. **Race-Condition Safeguards:** Network state changes and purchase submissions utilize monotonic sequence counters and synchronous locks to prevent out-of-order state overwrites.
+1. **Non-Custodial Invariants:** Digital assets are never entrusted to an intermediary third party; only the atomic settlement condition defined by the policy can unlock or transfer items.
+2. **Atomic Upstream Splits:** Upstream recipients (e.g. Protocol Treasury) receive their programmed share in the exact same transaction envelope as the seller and creator. If any transfer fails, the entire transaction reverts.
+3. **No Hardcoded Accounts:** All signatures and transactions dynamically identify the connected Freighter account.
+4. **On-Chain Event Verification:** All listing and purchase actions emit standard Soroban events `(KIOSK, "listed")` and `(KIOSK, "bought")` indexed on Stellar block explorers.
 
 ---
 
 ## 📄 License
 
-This project is open-source under the [MIT License](LICENSE).
+This project is licensed under the [MIT License](LICENSE).

@@ -60,33 +60,11 @@ describe('Wallet & Network Switcher Integration', () => {
     expect(screen.getByRole('button', { name: /disconnect/i })).toBeInTheDocument();
   });
 
-  it('switches between TESTNET and MAINNET seamlessly', async () => {
+  it('displays the dedicated TESTNET network badge', async () => {
     renderTopBar();
 
-    // Default network is TESTNET
-    const networkToggle = screen.getByRole('button', { name: /testnet/i });
-    expect(networkToggle).toBeInTheDocument();
-
-    // Click to open network dropdown
-    fireEvent.click(networkToggle);
-
-    // Select MAINNET
-    const mainnetOption = screen.getByRole('button', { name: /^mainnet$/i });
-    fireEvent.click(mainnetOption);
-
-    // Network toggle now shows MAINNET
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: /mainnet/i })).toBeInTheDocument();
-    });
-
-    // Switch back to TESTNET
-    const mainnetToggle = screen.getByRole('button', { name: /mainnet/i });
-    fireEvent.click(mainnetToggle);
-    const testnetOption = screen.getByRole('button', { name: /^testnet$/i });
-    fireEvent.click(testnetOption);
-
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: /testnet/i })).toBeInTheDocument();
-    });
+    // Network is fixed to TESTNET
+    const testnetBadge = screen.getByText(/^TESTNET$/i);
+    expect(testnetBadge).toBeInTheDocument();
   });
 });
