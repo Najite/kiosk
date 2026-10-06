@@ -6,7 +6,7 @@
 [![Network](https://img.shields.io/badge/Network-Stellar%20Testnet-green.svg)](https://stellar.org)
 [![Contracts](https://img.shields.io/badge/Smart%20Contracts-Soroban%20v21-purple.svg)](https://soroban.stellar.org)
 [![Settlement](https://img.shields.io/badge/Settlement-Atomic%20On--Chain%20Escrow-cyan.svg)](https://soroban.stellar.org)
-[![Architecture](https://img.shields.io/badge/Architecture-100%25%20Decentralized-emerald.svg)](https://stellar.expert)
+[![Zero-Config](https://img.shields.io/badge/Zero--Config-No%20.env%20Required-emerald.svg)](https://stellar.expert)
 
 ---
 
@@ -25,7 +25,7 @@ The project runs as a **100% decentralized Web3 protocol** on Stellar Testnet wi
 | Parameter | Value |
 | :--- | :--- |
 | **Network** | Stellar Testnet (`Passphrase: Test SDF Network ; September 2015`) |
-| **Kiosk Contract ID** | [`CB3AQGQ6MXJVJ26ICU5CDIGSVUKS2LNCEBMZEVM2GO6RARSJ367CLQQB`](https://stellar.expert/explorer/testnet/contract/CB3AQGQ6MXJVJ26ICU5CDIGSVUKS2LNCEBMZEVM2GO6RARSJ367CLQQB) |
+| **Showcase Kiosk Contract ID** | [`CB3AQGQ6MXJVJ26ICU5CDIGSVUKS2LNCEBMZEVM2GO6RARSJ367CLQQB`](https://stellar.expert/explorer/testnet/contract/CB3AQGQ6MXJVJ26ICU5CDIGSVUKS2LNCEBMZEVM2GO6RARSJ367CLQQB) |
 | **WASM Hash** | `b6b584e187732e5d66807bc993d0c15feae17e22d33bd100897735ad70a9585a` |
 | **Native SAC (XLM)** | [`CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC`](https://stellar.expert/explorer/testnet/contract/CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC) |
 | **Protocol Treasury** | `GD54GYI3SRVER7O56DLEXZEXQ2UJVXIOOXZYVV5ITCZ4MOEJ3XFLXNVO` |
@@ -94,11 +94,6 @@ The project runs as a **100% decentralized Web3 protocol** on Stellar Testnet wi
   * **React Component:** `@stellarkiosk/widget`
   * **HTML Web Component:** `<stellar-kiosk-button>`
   * **Iframe Embed:** Standalone hosted iframe snippet.
-
-### 6. 💼 Grant Proposal & Roadmap (`GrantProposal`)
-* Complete formatted grant proposal for **Stellar Community Fund (SCF) / Drips Wave**:
-  * Problem statement, architecture, milestones, deliverables, and budget distribution.
-  * One-click clipboard export for ecosystem submission.
 
 ---
 
@@ -179,26 +174,14 @@ pub fn get_owner(env: Env) -> Result<Address, KioskError>;
 - **Freighter Wallet Extension** configured to **Testnet**
 - *(Optional for contract development)*: **Rust** with `wasm32-unknown-unknown` and `stellar-cli`
 
-### 1. Clone & Configure Environment
+### 1. Clone & Run (Zero-Config Out of the Box)
+
+No `.env` file or API keys are required. All network configurations and Stellar Asset Contract addresses are derived deterministically in-code.
 
 ```bash
 git clone https://github.com/Najite/kiosk.git
 cd kiosk
 
-# Configure environment variables (.env)
-cp .env.example .env # or verify .env exists:
-```
-
-Ensure `.env` contains:
-```env
-VITE_STELLAR_NETWORK=TESTNET
-VITE_SOROBAN_CONTRACT_ID=CB3AQGQ6MXJVJ26ICU5CDIGSVUKS2LNCEBMZEVM2GO6RARSJ367CLQQB
-VITE_SOROBAN_SAC_XLM=CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC
-```
-
-### 2. Run the Frontend
-
-```bash
 # Install dependencies
 npm install
 
@@ -208,17 +191,17 @@ npm run dev
 
 Open [http://localhost:5173](http://localhost:5173) in your browser.
 
-### 3. Build & Test
+### 2. Build & Test
 
 ```bash
-# Run frontend test suite
-npm run test
+# Run unit & integration tests
+npx vitest run
 
 # Typecheck and build production bundle
 npm run build
 ```
 
-### 4. Build Soroban Smart Contracts (Rust)
+### 3. Build Soroban Smart Contracts (Rust)
 
 ```bash
 # Compile contract WASM
@@ -235,7 +218,8 @@ cargo test -p kiosk
 1. **Non-Custodial Invariants:** Digital assets are never entrusted to an intermediary third party; only the atomic settlement condition defined by the policy can unlock or transfer items.
 2. **Atomic Upstream Splits:** Upstream recipients (e.g. Protocol Treasury) receive their programmed share in the exact same transaction envelope as the seller and creator. If any transfer fails, the entire transaction reverts.
 3. **No Hardcoded Accounts:** All signatures and transactions dynamically identify the connected Freighter account.
-4. **On-Chain Event Verification:** All listing and purchase actions emit standard Soroban events `(KIOSK, "listed")` and `(KIOSK, "bought")` indexed on Stellar block explorers.
+4. **Deterministic Token Standards:** Native Stellar Asset Contract (SAC) addresses for Testnet and Mainnet are derived automatically from the network rather than brittle environment configurations.
+5. **On-Chain Event Verification:** All listing and purchase actions emit standard Soroban events `(KIOSK, "listed")` and `(KIOSK, "bought")` indexed on Stellar block explorers.
 
 ---
 
