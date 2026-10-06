@@ -6,6 +6,7 @@ import {
   requestAccess as freighterRequestAccess,
   getAddress as freighterGetAddress,
   getNetworkDetails as freighterGetNetworkDetails,
+  signTransaction as freighterSignTransaction,
   WatchWalletChanges,
 } from '@stellar/freighter-api';
 import {
@@ -35,6 +36,7 @@ export type WalletContextType = {
   shortAddr: string;
   refreshAccount: () => Promise<void>;
   fundAccount: () => Promise<boolean>;
+  signTx: (xdrBase64: string) => Promise<string | null>;
 };
 
 const WalletContext = createContext<WalletContextType | null>(null);
@@ -201,6 +203,28 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     return ok;
   };
 
+  const signTx = async (xdrBase64: string): Promise<string | null> => {
+    try {
+      if (isSimulated || !isFreighterInstalled) {
+        return xdrBase64;
+      }
+      const signed = await freighterSignTransaction(xdrBase64, {
+        networkPassphrase: STELLAR_CONFIG[network].passphrase,
+      });
+      if (typeof signed === 'string') {
+        return signed;
+      }
+      if (signed && typeof (signed as any).signedTxXdr === 'string') {
+        return (signed as any).signedTxXdr;
+      }
+      return null;
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Freighter signing failed';
+      setError(msg);
+      return null;
+    }
+  };
+
   const value: WalletContextType = {
     address,
     isConnected: !!address,
@@ -217,6 +241,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     shortAddr: address ? shortAddress(address, 4) : '',
     refreshAccount,
     fundAccount,
+    signTx,
   };
 
   return <WalletContext.Provider value={value}>{children}</WalletContext.Provider>;

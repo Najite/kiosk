@@ -72,16 +72,20 @@ export type WidgetConfig = {
   created_at: string;
 };
 
-// Seed protocol defaults
+// Deployed Testnet Contract & Admin Identity
+export const LIVE_TESTNET_CONTRACT_ID = 'CDP5VMLME3NOXC7G3ZFRBGUMXNGIDYG7IMKBZLS4KPAZCVB6SSY4O2EG';
+export const LIVE_TESTNET_OWNER = 'GBOLOWBCVE2AZ3XTFKQURYTSLZHTXA2IM7JSKIYOJB37XVTDPJTAEB5X';
+
+// Seed protocol defaults (aligned with real on-chain Testnet state)
 const SEED_KIOSK: Kiosk = {
   id: '3f6c8270-17e9-4e7a-9a99-b1d7d825c7e1',
-  owner_address: 'GDMX7A2QZ54V4QBTQRMZKAY3UGZ7JZ5YGP7ZU4F4ZZJ7K3KQM4X6Q3AL',
-  name: 'StellarForge DevKiosk',
-  description: 'Composable escrow kiosk for open-source software licenses and digital passes on Soroban.',
+  owner_address: LIVE_TESTNET_OWNER,
+  name: 'StellarForge DevKiosk (Testnet)',
+  description: 'Composable escrow kiosk for open-source software licenses and digital passes on Soroban Testnet.',
   settlement_token: 'XLM',
   is_initialized: true,
-  contract_id: 'CA3D5KRYM6CB7EFQKPTX3X4D5J7YZKQXKL5Q6Q3HOKFD4A2JFZ4S2C5Y',
-  total_sales_volume: 4850,
+  contract_id: LIVE_TESTNET_CONTRACT_ID,
+  total_sales_volume: 50,
   created_at: new Date().toISOString(),
 };
 

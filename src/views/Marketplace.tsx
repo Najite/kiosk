@@ -15,6 +15,12 @@ import {
 } from 'lucide-react';
 import { kioskStorage, type Kiosk, type KioskItem, type TransferPolicy, type EscrowTransaction } from '@/lib/kiosk';
 import {
+  fetchContractPolicy,
+  fetchContractItem,
+  fetchContractEvents,
+  type OnChainEvent,
+} from '@/lib/soroban';
+import {
   generateStellarAddress,
   generateTxHash,
   shortAddress,
@@ -41,12 +47,49 @@ export function Marketplace() {
   const [completedTx, setCompletedTx] = useState<EscrowTransaction | null>(null);
   const isPurchasingRef = useRef(false);
 
+  const [onChainSync, setOnChainSync] = useState<{
+    item1: any | null;
+    policy: any | null;
+    events: OnChainEvent[];
+  }>({ item1: null, policy: null, events: [] });
+
   const load = useCallback(async () => {
     setLoading(true);
     const kData = await kioskStorage.getKiosk(address, isSimulated);
     if (kData) {
       setKiosk(kData);
-      const iData = await kioskStorage.getItems(kData.id, address, isSimulated);
+      let iData = await kioskStorage.getItems(kData.id, address, isSimulated);
+
+      // Attempt to query live on-chain item from deployed Soroban contract
+      try {
+        const onChainItem = await fetchContractItem(1);
+        const onChainPolicy = await fetchContractPolicy();
+        const liveEvents = await fetchContractEvents();
+
+        setOnChainSync({
+          item1: onChainItem,
+          policy: onChainPolicy,
+          events: liveEvents,
+        });
+
+        if (onChainItem && iData.length > 0) {
+          // Sync live item state from contract
+          iData = iData.map((it) => {
+            if (it.id === 'item-101' || it.id === '1') {
+              return {
+                ...it,
+                title: onChainItem.title || it.title,
+                price: Number(onChainItem.price) / 10000000 || it.price,
+                status: onChainItem.isListed ? 'AVAILABLE' : 'SETTLED',
+              };
+            }
+            return it;
+          });
+        }
+      } catch (err) {
+        console.warn('Live Soroban fetch fallback:', err);
+      }
+
       setItems(iData);
 
       const pm = await kioskStorage.getPolicies(address, isSimulated);
@@ -140,26 +183,34 @@ export function Marketplace() {
 
   return (
     <div className="space-y-5 animate-fade-in">
-      {/* Mode Banner */}
-      {!isLive ? (
-        <div className="p-3 rounded-xl bg-amber/5 border border-amber/20 flex flex-wrap items-center justify-between gap-2 text-xs">
-          <div className="flex items-center gap-2 text-amber-200">
-            <span className="h-2 w-2 rounded-full bg-amber animate-pulse" />
-            <span><strong>Sandbox Demo Mode:</strong> Reviewing simulated marketplace listings and test purchases.</span>
-          </div>
-          <button onClick={() => connect()} className="text-[11px] font-semibold text-amber hover:underline">
-            Connect Live Wallet &rarr;
-          </button>
+      {/* On-Chain Soroban Protocol Status */}
+      <div className="p-3 rounded-xl bg-cyan/5 border border-cyan/20 flex flex-wrap items-center justify-between gap-3 text-xs">
+        <div className="flex items-center gap-2 text-cyan-200">
+          <span className="h-2 w-2 rounded-full bg-cyan animate-pulse" />
+          <span>
+            <strong>Soroban Testnet Contract:</strong>{' '}
+            <code className="font-mono text-white bg-black/40 px-1.5 py-0.5 rounded text-[11px]">
+              {kiosk?.contract_id ? shortAddress(kiosk.contract_id, 8) : 'Deploying...'}
+            </code>
+          </span>
+          {onChainSync.item1 && (
+            <span className="text-[10px] text-emerald bg-emerald/10 border border-emerald/20 px-1.5 py-0.5 rounded font-mono">
+              Item #1 On-Chain Verified
+            </span>
+          )}
         </div>
-      ) : (
-        <div className="p-3 rounded-xl bg-emerald/5 border border-emerald/20 flex items-center justify-between text-xs text-emerald-200">
-          <div className="flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-emerald animate-pulse" />
-            <span><strong>Live Account Mode:</strong> Connected as <code className="font-mono text-white">{shortAddress(address || '')}</code></span>
-          </div>
-          <span className="text-[10px] font-mono text-emerald bg-emerald/10 px-2 py-0.5 rounded border border-emerald/20">Active Session</span>
-        </div>
-      )}
+        {kiosk?.contract_id && (
+          <a
+            href={`https://stellar.expert/explorer/testnet/contract/${kiosk.contract_id}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-[11px] text-cyan hover:underline font-mono"
+          >
+            <span>Stellar Expert Explorer</span>
+            <ExternalLink className="w-3 h-3" />
+          </a>
+        )}
+      </div>
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -357,7 +408,15 @@ export function Marketplace() {
                 <div className="panel-tight p-3 space-y-1">
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-gray-500">Tx Hash</span>
-                    <span className="mono text-cyan">{shortAddress(completedTx.tx_hash, 8)}</span>
+                    <a
+                      href={`https://stellar.expert/explorer/testnet/tx/${completedTx.tx_hash}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mono text-cyan hover:underline inline-flex items-center gap-1"
+                    >
+                      <span>{shortAddress(completedTx.tx_hash, 8)}</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
                   </div>
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-gray-500">Buyer</span>

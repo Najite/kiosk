@@ -85,6 +85,10 @@ The project is built as a **100% decentralized Web3 protocol** with **zero centr
 * **Simulated Sandbox Fallback:** Reviewers without the Freighter extension can click **"Continue with Simulated Demo Account"** to test the entire suite instantly.
 
 ### 8. 🦀 Rust Soroban Smart Contracts (`contracts/kiosk`)
+* **Live Testnet Contract:** [`CDP5VMLME3NOXC7G3ZFRBGUMXNGIDYG7IMKBZLS4KPAZCVB6SSY4O2EG`](https://stellar.expert/explorer/testnet/contract/CDP5VMLME3NOXC7G3ZFRBGUMXNGIDYG7IMKBZLS4KPAZCVB6SSY4O2EG)
+* **Contract Admin / Deployer:** `GBOLOWBCVE2AZ3XTFKQURYTSLZHTXA2IM7JSKIYOJB37XVTDPJTAEB5X`
+* **Initialization Tx:** [`de9de343e30af1fdb7d2d08e2edf1ddd887faa137ca31f164a45f6c12a7cb6ed`](https://stellar.expert/explorer/testnet/tx/de9de343e30af1fdb7d2d08e2edf1ddd887faa137ca31f164a45f6c12a7cb6ed)
+* **On-Chain Listing Tx:** [`9ea828c0f151913665dcbec160da0bff12c7a7d7476f9d7f5120e912efa01702`](https://stellar.expert/explorer/testnet/tx/9ea828c0f151913665dcbec160da0bff12c7a7d7476f9d7f5120e912efa01702)
 * **`initialize`:** Sets owner address, default royalty basis points, royalty recipient, and floor price.
 * **`set_policy`:** Updates policy rules with `caller.require_auth()` owner protection.
 * **`place_and_list`:** Places an asset in persistent storage, validates floor price, and publishes a `(KIOSK, "listed")` event.
@@ -97,12 +101,13 @@ The project is built as a **100% decentralized Web3 protocol** with **zero centr
 
 | Layer | Technologies |
 | :--- | :--- |
-| **Smart Contracts** | Rust, Soroban SDK (`soroban-sdk 21.0.0`), WebAssembly (`wasm32-unknown-unknown`) |
+| **Smart Contracts** | Rust, Soroban SDK (`soroban-sdk 21.7.7`), WebAssembly (`wasm32v1-none`), Stellar CLI 27.0 |
+| **Deployed Testnet Contract** | [`CDP5VMLME3NOXC7G3ZFRBGUMXNGIDYG7IMKBZLS4KPAZCVB6SSY4O2EG`](https://stellar.expert/explorer/testnet/contract/CDP5VMLME3NOXC7G3ZFRBGUMXNGIDYG7IMKBZLS4KPAZCVB6SSY4O2EG) |
 | **Frontend Framework** | React 18, TypeScript, Vite, Tailwind CSS |
-| **Stellar SDKs** | `@stellar/stellar-sdk` (v13.3.0), `@stellar/freighter-api` (v3.0.0) |
-| **UI & Icons** | Lucide React Icons, Custom Glassmorphism UI Token System |
+| **Stellar SDKs** | `@stellar/stellar-sdk` (v17.2.1), `@stellar/freighter-api` (v6.0.1) |
+| **UI & Icons** | Lucide React Icons, Glassmorphism UI Token System |
 | **Testing** | Vitest (v2.1.8), `@testing-library/react`, `jsdom` |
-| **Protocol Storage** | Pure decentralized browser & ledger client (`src/lib/kiosk.ts`) — Zero Centralized DB |
+| **Protocol Storage** | Pure decentralized ledger & Horizon/Soroban RPC client (`src/lib/soroban.ts`, `src/lib/kiosk.ts`) |
 
 ---
 

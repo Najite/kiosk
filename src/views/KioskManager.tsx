@@ -263,14 +263,26 @@ export function KioskManager() {
             <div>
               <Label>Soroban Contract ID</Label>
               {kiosk.contract_id ? (
-                <div className="flex items-center gap-2">
-                  <p className="mono text-xs text-gray-300 truncate flex-1">{kiosk.contract_id}</p>
-                  <button
-                    onClick={copyContract}
-                    className="text-gray-500 hover:text-cyan transition-colors"
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <p className="mono text-xs text-gray-300 truncate flex-1">{kiosk.contract_id}</p>
+                    <button
+                      onClick={copyContract}
+                      className="text-gray-500 hover:text-cyan transition-colors"
+                      title="Copy Contract ID"
+                    >
+                      {copied ? <Check className="h-3.5 w-3.5 text-emerald" /> : <Copy className="h-3.5 w-3.5" />}
+                    </button>
+                  </div>
+                  <a
+                    href={`https://stellar.expert/explorer/testnet/contract/${kiosk.contract_id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-[11px] text-cyan hover:underline"
                   >
-                    {copied ? <Check className="h-3.5 w-3.5 text-emerald" /> : <Copy className="h-3.5 w-3.5" />}
-                  </button>
+                    <span>View Contract on Stellar Expert</span>
+                    <ExternalLink className="h-3 w-3" />
+                  </a>
                 </div>
               ) : (
                 <p className="text-xs text-gray-600">Not yet deployed</p>

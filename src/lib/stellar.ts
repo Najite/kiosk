@@ -2,6 +2,8 @@ import { Horizon, Networks } from '@stellar/stellar-sdk';
 
 export type StellarNetwork = 'TESTNET' | 'MAINNET';
 
+export const TESTNET_CONTRACT_ID = 'CDP5VMLME3NOXC7G3ZFRBGUMXNGIDYG7IMKBZLS4KPAZCVB6SSY4O2EG';
+
 export const STELLAR_CONFIG = {
   TESTNET: {
     network: 'TESTNET' as StellarNetwork,
@@ -10,6 +12,8 @@ export const STELLAR_CONFIG = {
     sorobanRpcUrl: 'https://soroban-testnet.stellar.org',
     explorerTxUrl: 'https://stellar.expert/explorer/testnet/tx/',
     explorerAccountUrl: 'https://stellar.expert/explorer/testnet/account/',
+    explorerContractUrl: 'https://stellar.expert/explorer/testnet/contract/',
+    contractId: TESTNET_CONTRACT_ID,
   },
   MAINNET: {
     network: 'MAINNET' as StellarNetwork,
@@ -18,11 +22,17 @@ export const STELLAR_CONFIG = {
     sorobanRpcUrl: 'https://mainnet.sorobanrpc.com',
     explorerTxUrl: 'https://stellar.expert/explorer/public/tx/',
     explorerAccountUrl: 'https://stellar.expert/explorer/public/account/',
+    explorerContractUrl: 'https://stellar.expert/explorer/public/contract/',
+    contractId: '',
   },
 } as const;
 
 export function getHorizonServer(network: StellarNetwork): Horizon.Server {
   return new Horizon.Server(STELLAR_CONFIG[network].horizonUrl);
+}
+
+export function getSorobanRpcUrl(network: StellarNetwork): string {
+  return STELLAR_CONFIG[network].sorobanRpcUrl;
 }
 
 export async function fetchLiveAccount(address: string, network: StellarNetwork) {
