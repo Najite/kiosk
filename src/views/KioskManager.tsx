@@ -97,8 +97,6 @@ export function KioskManager() {
     try {
       const priceVal = parseFloat(newItem.price) || 0;
 
-      let onchainId: number | undefined;
-
       if (!address || !isConnected) {
         throw new Error('Please connect your Freighter wallet on Stellar Testnet to list assets.');
       }
@@ -112,7 +110,7 @@ export function KioskManager() {
         priceInXlm: priceVal,
         contractId: kiosk.contract_id || undefined,
       });
-      onchainId = nextItemId;
+      const onchainId = nextItemId;
 
       // 2. Request Freighter signature
       const signedXdr = await signTx(xdrBase64);
@@ -138,9 +136,10 @@ export function KioskManager() {
       setItems([created, ...items]);
       setNewItem({ title: '', description: '', asset_type: 'License', price: '0', icon: 'Package' });
       setAddItemOpen(false);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to list item on-chain:', err);
-      setAddError(err?.message || 'Failed to list asset on Soroban');
+      const msg = err instanceof Error ? err.message : 'Failed to list asset on Soroban';
+      setAddError(msg);
     } finally {
       setIsAdding(false);
     }
@@ -215,7 +214,6 @@ export function KioskManager() {
   }
 
   const availableCount = items.filter((i) => i.status === 'AVAILABLE').length;
-  const escrowCount = items.filter((i) => i.status === 'IN_ESCROW').length;
   const settledCount = items.filter((i) => i.status === 'SETTLED').length;
 
   return (
@@ -254,7 +252,7 @@ export function KioskManager() {
         <StatCard
           label="Stored Assets"
           value={String(items.length)}
-          sub={`${availableCount} available · ${escrowCount} in escrow`}
+          sub={`${availableCount} available · ${settledCount} settled`}
           icon={<Package className="h-4 w-4" />}
           accent="cyan"
         />

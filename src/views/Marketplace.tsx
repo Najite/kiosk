@@ -11,20 +11,20 @@ import {
   Zap,
   Activity,
   ExternalLink,
-  Sparkles,
 } from 'lucide-react';
 import { kioskStorage, type Kiosk, type KioskItem, type TransferPolicy, type EscrowTransaction } from '@/lib/kiosk';
 import {
   fetchContractPolicy,
-  fetchContractItem,
+  fetchAllContractItems,
   fetchContractEvents,
   buildPurchaseTx,
   submitSignedTx,
   type OnChainEvent,
+  type OnChainItem,
+  type OnChainPolicy,
+  type OnChainUpstreamSplit,
 } from '@/lib/soroban';
 import {
-  generateStellarAddress,
-  generateTxHash,
   shortAddress,
   formatTokenAmount,
   calculatePayouts,
@@ -38,7 +38,7 @@ import { Panel, SectionTitle, Badge, Button, Modal, StatusDot, StatCard, EmptySt
 type CheckoutStep = 'idle' | 'review' | 'signing' | 'settling' | 'done';
 
 export function Marketplace() {
-  const { address, isConnected, connect, shortAddr, signTx, refreshAccount } = useWallet();
+  const { address, isConnected, connect, signTx, refreshAccount } = useWallet();
   const [kiosk, setKiosk] = useState<Kiosk | null>(null);
   const [items, setItems] = useState<KioskItem[]>([]);
   const [policies, setPolicies] = useState<Record<string, TransferPolicy>>({});
@@ -50,8 +50,8 @@ export function Marketplace() {
   const isPurchasingRef = useRef(false);
 
   const [onChainSync, setOnChainSync] = useState<{
-    item1: any | null;
-    policy: any | null;
+    item1: OnChainItem | null;
+    policy: OnChainPolicy | null;
     events: OnChainEvent[];
   }>({ item1: null, policy: null, events: [] });
 
@@ -76,7 +76,7 @@ export function Marketplace() {
 
         if (onChainItems.length > 0 && iData.length > 0) {
           // Index on-chain items by ID
-          const onChainMap = new Map(onChainItems.map((c) => [c.id, c]));
+          const onChainMap = new Map<number, OnChainItem>(onChainItems.map((c: OnChainItem) => [c.id, c]));
 
           iData = iData.map((it) => {
             const ocId = it.onchain_id ?? (it.id === 'item-101' ? 1 : it.id === 'item-102' ? 2 : it.id === 'item-103' ? 3 : it.id === 'item-104' ? 4 : undefined);
@@ -121,8 +121,8 @@ export function Marketplace() {
     id: 'default-policy',
     item_id: selectedItem?.id || '',
     min_royalty_bps: onChainSync.policy?.royaltyBps ?? 750,
-    upstream_split_bps: (onChainSync.policy?.upstreamSplits || []).reduce((acc, s) => acc + s.shareBps, 0) || 250,
-    upstream_recipients: (onChainSync.policy?.upstreamSplits || []).map((s) => ({
+    upstream_split_bps: (onChainSync.policy?.upstreamSplits || []).reduce((acc: number, s: OnChainUpstreamSplit) => acc + s.shareBps, 0) || 250,
+    upstream_recipients: (onChainSync.policy?.upstreamSplits || []).map((s: OnChainUpstreamSplit) => ({
       label: 'Protocol Treasury',
       address: s.recipient,
       shareBps: s.shareBps,
@@ -231,9 +231,10 @@ export function Marketplace() {
       await refreshAccount();
 
       setCheckoutStep('done');
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Purchase execution error:', err);
-      setPurchaseError(err?.message || 'Transaction execution failed');
+      const msg = err instanceof Error ? err.message : 'Transaction execution failed';
+      setPurchaseError(msg);
       setCheckoutStep('review');
     } finally {
       isPurchasingRef.current = false;

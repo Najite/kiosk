@@ -191,25 +191,37 @@ npm run dev
 
 Open [http://localhost:5173](http://localhost:5173) in your browser.
 
-### 2. Build & Test
+### 2. Full Verification Suite
 
 ```bash
-# Run unit & integration tests
-npx vitest run
+# Typecheck TypeScript code
+npm run typecheck
 
-# Typecheck and build production bundle
+# Run linter
+npm run lint
+
+# Run Vitest test suite
+npm test
+
+# Build production bundle
 npm run build
 ```
 
-### 3. Build Soroban Smart Contracts (Rust)
+### 3. Build & Test Soroban Smart Contracts (Rust)
 
 ```bash
-# Compile contract WASM
-cargo build --target wasm32-unknown-unknown --release
+# Run Rust smart contract unit tests
+cargo test --manifest-path contracts/kiosk/Cargo.toml
 
-# Run Rust unit tests
-cargo test -p kiosk
+# Compile optimized WebAssembly contract
+cargo build --manifest-path contracts/kiosk/Cargo.toml --target wasm32-unknown-unknown --release
 ```
+
+---
+
+## 🤝 Contributing
+
+We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for full setup instructions, architecture notes, and contribution guidelines. Check out the issues backlog in [`.github/ISSUES.md`](.github/ISSUES.md).
 
 ---
 

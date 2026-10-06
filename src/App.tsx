@@ -33,7 +33,9 @@ function App() {
     setRoute(r);
     try {
       localStorage.setItem('stellarkiosk_route', r);
-    } catch {}
+    } catch {
+      // Ignore storage write error
+    }
     window.scrollTo(0, 0);
   };
 
@@ -41,7 +43,9 @@ function App() {
     setActiveView(v);
     try {
       localStorage.setItem('stellarkiosk_view', v);
-    } catch {}
+    } catch {
+      // Ignore storage write error
+    }
   };
 
   const enterDashboard = (targetView?: ViewId) => {

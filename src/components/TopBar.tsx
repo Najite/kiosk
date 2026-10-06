@@ -4,17 +4,16 @@ import {
   Shield,
   Code2,
   Store,
-  FileText,
   Wallet,
   Power,
   ChevronDown,
-  Zap,
   ExternalLink,
   RefreshCw,
   Coins,
+  Zap,
 } from 'lucide-react';
 import { useWallet } from '@/context/WalletContext';
-import { shortAddress, STELLAR_CONFIG } from '@/lib/stellar';
+import { STELLAR_CONFIG } from '@/lib/stellar';
 import { ConnectModal } from '@/components/ConnectModal';
 
 export type ViewId = 'kiosk' | 'policy' | 'widget' | 'marketplace';
@@ -42,7 +41,6 @@ export function TopBar({
     disconnect,
     network,
     freighterNetwork,
-    setNetwork,
     shortAddr,
     xlmBalance,
     accountExists,
@@ -50,28 +48,13 @@ export function TopBar({
     fundAccount,
   } = useWallet();
   const [walletOpen, setWalletOpen] = useState(false);
-  const [netOpen, setNetOpen] = useState(false);
-  const [networkToast, setNetworkToast] = useState<string | null>(null);
-
   const isMainnetMismatch =
-    isConnected &&
+    Boolean(isConnected &&
     freighterNetwork &&
-    (freighterNetwork.includes('PUBLIC') || freighterNetwork.includes('MAIN'));
-
-  const handleNetworkSelect = async (n: 'TESTNET' | 'MAINNET') => {
-    setNetOpen(false);
-    if (n === network) return;
-    setNetworkToast(`Switching to Stellar ${n}...`);
-    await setNetwork(n);
-    setTimeout(() => {
-      setNetworkToast(`Connected to Stellar ${n}`);
-      setTimeout(() => setNetworkToast(null), 2500);
-    }, 400);
-  };
+    (freighterNetwork.includes('PUBLIC') || freighterNetwork.includes('MAIN')));
   const [funding, setFunding] = useState(false);
   const [showConnectModal, setShowConnectModal] = useState(false);
   const walletRef = useRef<HTMLDivElement>(null);
-  const netRef = useRef<HTMLDivElement>(null);
 
   const handleConnectClick = async () => {
     const success = await connect();
@@ -84,9 +67,6 @@ export function TopBar({
     const handler = (e: MouseEvent) => {
       if (walletRef.current && !walletRef.current.contains(e.target as Node)) {
         setWalletOpen(false);
-      }
-      if (netRef.current && !netRef.current.contains(e.target as Node)) {
-        setNetOpen(false);
       }
     };
     document.addEventListener('click', handler);
@@ -275,14 +255,6 @@ export function TopBar({
           );
         })}
       </nav>
-
-      {/* Network Switch Toast Notification */}
-      {networkToast && (
-        <div className="fixed bottom-5 right-5 z-50 animate-slide-up flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-obsidian-light border border-cyan/30 shadow-2xl text-xs text-white">
-          <span className={`h-2 w-2 rounded-full ${network === 'TESTNET' ? 'bg-amber' : 'bg-emerald'} animate-pulse`} />
-          <span className="font-medium">{networkToast}</span>
-        </div>
-      )}
 
       {/* Wallet Connection Modal */}
       <ConnectModal

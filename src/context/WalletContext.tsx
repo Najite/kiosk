@@ -11,7 +11,6 @@ import {
 } from '@stellar/freighter-api';
 import {
   shortAddress,
-  generateStellarAddress,
   fetchLiveAccount,
   fundTestnetAccount,
   STELLAR_CONFIG,
@@ -218,8 +217,8 @@ export function WalletProvider({ children }: { children: ReactNode }) {
             );
           }
         }
-      } catch (err: any) {
-        if (err.message && err.message.includes('Freighter extension is set to PUBLIC')) {
+      } catch (err: unknown) {
+        if (err instanceof Error && err.message.includes('Freighter extension is set to PUBLIC')) {
           throw err;
         }
       }
@@ -230,8 +229,8 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       if (typeof signed === 'string') {
         return signed;
       }
-      if (signed && typeof (signed as any).signedTxXdr === 'string') {
-        return (signed as any).signedTxXdr;
+      if (signed && typeof signed === 'object' && 'signedTxXdr' in signed && typeof (signed as { signedTxXdr?: unknown }).signedTxXdr === 'string') {
+        return (signed as { signedTxXdr: string }).signedTxXdr;
       }
       return null;
     } catch (err: unknown) {

@@ -2,6 +2,9 @@
 
 mod types;
 
+#[cfg(test)]
+mod test;
+
 use soroban_sdk::{
     contract, contracterror, contractimpl, symbol_short, token, Address, Env, String, Symbol, Vec,
 };
@@ -63,6 +66,7 @@ impl KioskContract {
         };
         env.storage().instance().set(&DataKey::Policy, &policy);
         env.storage().instance().set(&DataKey::ItemCount, &0u32);
+        env.storage().instance().extend_ttl(50_000, 100_000);
 
         env.events().publish(
             (KIOSK, symbol_short!("init")),
@@ -109,6 +113,7 @@ impl KioskContract {
             upstream_splits,
         };
         env.storage().instance().set(&DataKey::Policy, &policy);
+        env.storage().instance().extend_ttl(50_000, 100_000);
 
         env.events().publish(
             (KIOSK, symbol_short!("set_pol")),
@@ -162,7 +167,9 @@ impl KioskContract {
         };
 
         env.storage().persistent().set(&DataKey::Item(item_count), &item);
+        env.storage().persistent().extend_ttl(&DataKey::Item(item_count), 50_000, 100_000);
         env.storage().instance().set(&DataKey::ItemCount, &item_count);
+        env.storage().instance().extend_ttl(50_000, 100_000);
 
         env.events().publish(
             (KIOSK, symbol_short!("listed")),
@@ -284,5 +291,13 @@ impl KioskContract {
             .instance()
             .get(&DataKey::ItemCount)
             .unwrap_or(0)
+    }
+
+    /// Get kiosk admin/owner address
+    pub fn get_owner(env: Env) -> Result<Address, KioskError> {
+        env.storage()
+            .instance()
+            .get(&DataKey::Owner)
+            .ok_or(KioskError::NotInitialized)
     }
 }

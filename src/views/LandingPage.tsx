@@ -5,33 +5,22 @@ import {
   Shield,
   Code2,
   GitBranch,
-  Layers,
   ShoppingCart,
   Wallet,
   Check,
   Boxes,
   Store,
-  FileText,
   Copy,
   ExternalLink,
   ChevronRight,
   Cpu,
-  Flame,
   CheckCircle2,
-  Coins,
   Lock,
   Sparkles,
-  Terminal,
-  Activity,
   ArrowUpRight,
-  Scale,
-  RefreshCw,
-  Clock,
-  Award,
-  BookOpen,
 } from 'lucide-react';
 import { TESTNET_CONTRACT_ID } from '@/lib/stellar';
-import { fetchContractItem, fetchContractPolicy, fetchAllContractItems, fetchContractEvents, type OnChainItem } from '@/lib/soroban';
+import { fetchContractPolicy, fetchAllContractItems, type OnChainItem } from '@/lib/soroban';
 import { type ViewId } from '@/components/TopBar';
 
 export function LandingPage({ onEnter }: { onEnter: (view?: ViewId) => void }) {
@@ -399,7 +388,6 @@ function ProtocolLiveState({ onEnter }: { onEnter: (view?: ViewId) => void }) {
     minFloorPrice: bigint;
     royaltyRecipient: string;
   } | null>(null);
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function loadData() {
@@ -412,8 +400,6 @@ function ProtocolLiveState({ onEnter }: { onEnter: (view?: ViewId) => void }) {
         setPolicy(pol);
       } catch (err) {
         console.warn('Live Soroban fetch:', err);
-      } finally {
-        setLoading(false);
       }
     }
     loadData();

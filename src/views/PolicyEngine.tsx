@@ -11,7 +11,7 @@ import {
   Zap,
   ScrollText,
 } from 'lucide-react';
-import { kioskStorage, LIVE_TESTNET_OWNER, type Kiosk, type KioskItem, type TransferPolicy, type UpstreamRecipient } from '@/lib/kiosk';
+import { kioskStorage, type Kiosk, type KioskItem, type TransferPolicy, type UpstreamRecipient } from '@/lib/kiosk';
 import { useWallet } from '@/context/WalletContext';
 import { bpsToPercent, formatTokenAmount, formatDuration, calculatePayouts, shortAddress, TESTNET_CONTRACT_ID } from '@/lib/stellar';
 import { buildSetPolicyTx, submitSignedTx } from '@/lib/soroban';
@@ -148,9 +148,10 @@ export function PolicyEngine() {
       setDraft(updated);
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to save policy:', err);
-      setPolicyError(err?.message || 'Failed to save policy to Soroban');
+      const msg = err instanceof Error ? err.message : 'Failed to save policy to Soroban';
+      setPolicyError(msg);
     } finally {
       setSaving(false);
     }

@@ -24,3 +24,4 @@ dist-ssr
 .bolt
 target
 contracts/**/target
+contracts/**/test_snapshots

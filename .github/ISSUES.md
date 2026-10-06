@@ -49,32 +49,32 @@
 ---
 
 ### SK-002 · `bug` · L2 · Easy
-**Policy save shows "saved to Soroban" even on failure**
+**Policy save error state and Soroban RPC failure handling**
 
-**Description:** In `PolicyEngine.tsx`, the `savePolicy()` function sets `setSaved(true)` unconditionally after the save block — even when the Supabase update/insert returns an error. The success message also claims "saved to Soroban" but data is only persisted to Supabase.
+**Description:** In `PolicyEngine.tsx`, when updating on-chain policies, network or wallet signature rejections need clear error notifications rather than failing silently.
 
 **Acceptance criteria:**
-- `setSaved(true)` only fires on successful save
-- On error, show a visible error message (e.g. "Failed to save policy — try again")
-- Change success text from "saved to Soroban" to "Policy saved"
-- Add an `error` state that displays for 3 seconds on failure
+- `setSaved(true)` only fires on successful on-chain transaction confirmation
+- On error (rejected in Freighter or rejected by Soroban RPC), display a clear error alert
+- Add an `error` banner that displays for 4 seconds on failure
+- Automatically re-enable save button after error
 
 **Files:** `src/views/PolicyEngine.tsx`
 
 ---
 
 ### SK-003 · `bug` · L2 · Easy
-**KioskManager deleteItem has no error handling or confirmation**
+**Kiosk delist requires confirmation dialog and on-chain Soroban delist call**
 
-**Description:** `deleteItem()` in `KioskManager.tsx` fires `supabase.from('kiosk_items').delete()` with no error check and optimistically removes the item from the UI regardless of whether the DB delete succeeded. There is also no confirmation dialog before deletion.
+**Description:** `deleteItem()` in `KioskManager.tsx` currently only updates local state without invoking `delist` on the Soroban smart contract. There is also no confirmation dialog before removing an item.
 
 **Acceptance criteria:**
-- Add a confirmation modal before deleting ("Delete this asset? This cannot be undone.")
-- Check the Supabase response for errors
-- On error, restore the item in the UI and show an error message
-- On success, remove from UI
+- Add a confirmation modal before deleting ("Delist this asset? It will be marked unlisted on Soroban.")
+- Invoke `client.delist` on the Soroban smart contract with the seller's wallet authorization
+- On error, keep item listed and show an error banner
+- On success, update item status to delisted in UI
 
-**Files:** `src/views/KioskManager.tsx`
+**Files:** `src/views/KioskManager.tsx`, `src/lib/soroban.ts`
 
 ---
 
@@ -144,15 +144,15 @@
 ## Sprint 2 — Error Handling & Resilience
 
 ### SK-010 · `enhancement` · L3 · Medium
-**Add error states to all Supabase data-loading views**
+**Add error states to all Soroban data-loading views**
 
-**Description:** Every view that loads data from Supabase (`KioskManager`, `PolicyEngine`, `WidgetCustomizer`, `Marketplace`) has a loading spinner but no error state. If a Supabase call fails, the view either shows nothing or silently renders an empty screen.
+**Description:** Every view that loads on-chain data (`KioskManager`, `PolicyEngine`, `WidgetCustomizer`, `Marketplace`) has a loading spinner but lacks a visible error state. If Soroban RPC or Horizon calls fail or timeout, views should gracefully inform the user.
 
 **Acceptance criteria:**
-- Add an `error` state to each view's data-loading hook
-- On load failure, render a reusable `ErrorState` component with: error message, "Try again" button
-- The "Try again" button re-runs the load function
-- All Supabase calls in `load()` functions must check `error` and set the error state
+- Add an `error` state to each view's data-loading flow
+- On RPC failure or timeout, render a reusable `ErrorState` component with error details and a "Retry" button
+- The "Retry" button re-executes the load query
+- Display clear troubleshooting hints (e.g., check Testnet connection or Friendbot funding)
 - Add the `ErrorState` component to `src/components/ui.tsx`
 
 **Files:** `src/views/KioskManager.tsx`, `src/views/PolicyEngine.tsx`, `src/views/WidgetCustomizer.tsx`, `src/views/Marketplace.tsx`, `src/components/ui.tsx`
@@ -340,18 +340,18 @@
 ---
 
 ### SK-031 · `feature` · L3 · Medium
-**Add real-time Supabase subscriptions for transactions**
+**Add live Soroban event polling for marketplace transactions**
 
-**Description:** The Marketplace transaction ledger only updates on page load or after a local purchase. It does not reflect transactions from other sessions or browser tabs.
+**Description:** The Marketplace transaction ledger currently updates on page load or after a local purchase. It does not reflect transactions executed by other buyers on Testnet.
 
 **Acceptance criteria:**
-- Subscribe to Supabase realtime channel on `escrow_transactions` table for the active kiosk
-- New transactions appear in the ledger without a page refresh
-- Show a subtle "new transaction" animation when a row appears
-- Clean up the subscription on unmount
-- Handle connection errors gracefully (fall back to polling every 15s)
+- Poll Soroban Testnet RPC for new `KIOSK` events emitted on the contract
+- Parse `bought` and `listed` events from Soroban ledger
+- Automatically append new confirmed on-chain transactions to the ledger without page refresh
+- Show a subtle animation when a new transaction event appears
+- Clean up the polling timer on component unmount
 
-**Files:** `src/views/Marketplace.tsx`
+**Files:** `src/views/Marketplace.tsx`, `src/lib/soroban.ts`
 
 ---
 
@@ -378,11 +378,11 @@
 **Acceptance criteria:**
 - When `MULTISIG` mode is selected, show a signer configuration panel
 - Allow adding/removing signer Stellar addresses (similar to upstream recipients UI)
-- Store signers in the `transfer_policies` table (requires adding a `signers` jsonb column — create a migration)
+- Store signers in the policy structure
 - Show required signer count and current signer list in the marketplace checkout modal
-- Display pending multi-sig transactions in the transaction ledger with a "Awaiting signatures" status
+- Display pending multi-sig transactions in the transaction ledger with an "Awaiting signatures" status
 
-**Files:** `src/views/PolicyEngine.tsx`, `src/views/Marketplace.tsx`, new Supabase migration
+**Files:** `src/views/PolicyEngine.tsx`, `src/views/Marketplace.tsx`
 
 ---
 
@@ -474,21 +474,19 @@
 ---
 
 ### SK-042 · `testing` · L4 · Hard
-**Add integration tests for Supabase data flows**
+**Add integration tests for Kiosk state and Soroban RPC simulation**
 
-**Description:** All views load and persist data through Supabase but there are no integration tests verifying the data round-trips correctly.
+**Description:** Add automated integration tests verifying contract state queries, RPC transaction building, and split calculations.
 
 **Acceptance criteria:**
-- Set up Supabase test client pointing to a test schema
-- Test kiosk initialization flow: update kiosk → verify fields persist
-- Test item CRUD: insert item → verify query returns it → update → verify → delete → verify gone
-- Test policy save: insert policy for an item → verify it loads on next query
-- Test transaction creation: insert tx → verify it appears in query → verify kiosk sales volume updated
-- Test widget config: insert default config → update accent color → verify persistence
-- Mock Supabase client for unit-level isolation where appropriate
-- All tests pass with `npm run test`
+- Test kiosk initialization flow: initialize on-chain → verify state
+- Test item listing simulation: build `place_and_list` transaction → verify simulation success and returned ID
+- Test policy save simulation: build `set_policy` transaction → verify policy parameters
+- Test purchase transaction simulation: build `purchase` transaction with buyer address
+- Test payout calculation pure functions against known edge cases (zero royalty, 100% split threshold, rounding)
+- All tests pass with `npm test`
 
-**Files:** new `src/__tests__/integration/` directory with test files per entity
+**Files:** new `src/test/integration/` directory with test files per workflow
 
 ---
 

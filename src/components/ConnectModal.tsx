@@ -1,4 +1,4 @@
-import { ExternalLink, Sparkles, X, ShieldAlert } from 'lucide-react';
+import { ExternalLink, X, ShieldAlert } from 'lucide-react';
 
 interface ConnectModalProps {
   isOpen: boolean;

@@ -14,7 +14,7 @@ import {
 import { kioskStorage, type Kiosk, type KioskItem, type WidgetConfig } from '@/lib/kiosk';
 import { useWallet } from '@/context/WalletContext';
 import { formatTokenAmount, shortAddress } from '@/lib/stellar';
-import { Panel, SectionTitle, Badge, Button, Input, Label, Toggle } from '@/components/ui';
+import { Panel, SectionTitle, Badge, Input, Label, Toggle } from '@/components/ui';
 
 export function WidgetCustomizer() {
   const { address, isConnected, connect } = useWallet();

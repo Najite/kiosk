@@ -12,7 +12,6 @@ import {
 import {
   STELLAR_CONFIG,
   TESTNET_CONTRACT_ID,
-  TESTNET_SAC_XLM,
   getNativeSacAddress,
   type StellarNetwork,
 } from './stellar';
@@ -49,7 +48,7 @@ export type OnChainItem = {
 export type OnChainEvent = {
   id: string;
   topic: string[];
-  data: any;
+  data: unknown;
   ledger: number;
   ledgerClosedAt: string;
 };
@@ -86,7 +85,7 @@ export async function fetchContractPolicy(
 
     const val = scValToNative(sim.result.retval);
     const rawSplits = Array.isArray(val.upstream_splits) ? val.upstream_splits : [];
-    const upstreamSplits: OnChainUpstreamSplit[] = rawSplits.map((s: any) => ({
+    const upstreamSplits: OnChainUpstreamSplit[] = rawSplits.map((s: Record<string, unknown>) => ({
       recipient: String(s.recipient ?? ''),
       shareBps: Number(s.share_bps ?? 0),
     }));
@@ -233,7 +232,7 @@ export async function fetchContractEvents(
         }
       });
 
-      let data: any = null;
+      let data: unknown = null;
       try {
         data = scValToNative(e.value as unknown as xdr.ScVal);
       } catch {

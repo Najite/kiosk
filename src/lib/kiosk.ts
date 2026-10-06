@@ -1,8 +1,3 @@
-import {
-  formatTokenAmount,
-  shortAddress,
-  type StellarNetwork,
-} from '@/lib/stellar';
 
 export type Kiosk = {
   id: string;
