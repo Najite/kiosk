@@ -9,10 +9,14 @@ import {
   Keypair,
   xdr,
 } from '@stellar/stellar-sdk';
+import { signTransaction, isConnected as isFreighterConnected } from '@stellar/freighter-api';
 import {
   STELLAR_CONFIG,
   TESTNET_CONTRACT_ID,
+  DEMO_TESTNET_KEYPAIR,
   getNativeSacAddress,
+  stroopsToXlm,
+  xlmToStroops,
   type StellarNetwork,
 } from './stellar';
 
@@ -45,20 +49,12 @@ export type OnChainItem = {
   seller: string;
 };
 
-export type OnChainEvent = {
-  id: string;
-  topic: string[];
-  data: unknown;
-  ledger: number;
-  ledgerClosedAt: string;
-};
-
 export function getSorobanRpc(network: StellarNetwork = 'TESTNET'): rpc.Server {
   return new rpc.Server(STELLAR_CONFIG[network].sorobanRpcUrl);
 }
 
 /**
- * Read current contract policy from Soroban on-chain state
+ * Read current contract policy directly from Soroban on-chain storage
  */
 export async function fetchContractPolicy(
   contractId: string = TESTNET_CONTRACT_ID,
@@ -97,13 +93,13 @@ export async function fetchContractPolicy(
       upstreamSplits,
     };
   } catch (err) {
-    console.warn('Failed to query on-chain policy:', err);
+    console.warn('Failed to fetch on-chain policy:', err);
     return null;
   }
 }
 
 /**
- * Read total items registered on-chain
+ * Read total items registered in the Kiosk contract
  */
 export async function fetchContractItemCount(
   contractId: string = TESTNET_CONTRACT_ID,
@@ -124,17 +120,19 @@ export async function fetchContractItemCount(
       .build();
 
     const sim = await server.simulateTransaction(tx);
-    if (rpc.Api.isSimulationSuccess(sim) && sim.result?.retval) {
-      return Number(scValToNative(sim.result.retval));
+    if (!rpc.Api.isSimulationSuccess(sim) || !sim.result?.retval) {
+      return 0;
     }
-    return 0;
-  } catch {
+
+    return Number(scValToNative(sim.result.retval));
+  } catch (err) {
+    console.warn('Failed to fetch item count:', err);
     return 0;
   }
 }
 
 /**
- * Read specific item from Soroban on-chain storage
+ * Fetch a single item directly from the Kiosk contract persistent storage
  */
 export async function fetchContractItem(
   itemId: number,
@@ -166,9 +164,9 @@ export async function fetchContractItem(
       title: String(val.title ?? ''),
       description: String(val.description ?? ''),
       assetType: String(val.asset_type ?? 'License'),
-      price: BigInt(val.price),
+      price: BigInt(val.price ?? 0),
       isListed: Boolean(val.is_listed),
-      seller: String(val.seller),
+      seller: String(val.seller ?? ''),
     };
   } catch (err) {
     console.warn(`Failed to fetch on-chain item ${itemId}:`, err);
@@ -177,88 +175,69 @@ export async function fetchContractItem(
 }
 
 /**
- * Fetch all items available in the Kiosk contract by sequential query
+ * Fetch all items available in the Kiosk contract on Soroban
  */
 export async function fetchAllContractItems(
   contractId: string = TESTNET_CONTRACT_ID,
-  network: StellarNetwork = 'TESTNET',
-  maxItems: number = 30
+  network: StellarNetwork = 'TESTNET'
 ): Promise<OnChainItem[]> {
   const items: OnChainItem[] = [];
   const count = await fetchContractItemCount(contractId, network);
-  const limit = count > 0 ? count : maxItems;
 
-  for (let i = 1; i <= limit; i++) {
+  for (let i = 1; i <= count; i++) {
     const item = await fetchContractItem(i, contractId, network);
-    if (!item) {
-      if (count === 0) break;
-      continue;
+    if (item) {
+      items.push(item);
     }
-    items.push(item);
   }
   return items;
 }
 
 /**
- * Fetch live contract events published by Kiosk on Soroban ledger
+ * Signs and submits a prepared transaction either via Freighter or live testnet keypair
  */
-export async function fetchContractEvents(
-  contractId: string = TESTNET_CONTRACT_ID,
+async function signAndSubmitTx(
+  preparedTx: any,
+  callerAddress: string,
   network: StellarNetwork = 'TESTNET'
-): Promise<OnChainEvent[]> {
-  try {
-    const server = getSorobanRpc(network);
-    const latestLedgerRes = await server.getLatestLedger();
-    const latestLedger = latestLedgerRes.sequence;
-    const startLedger = Math.max(1, latestLedger - 10000);
+): Promise<{ txHash: string; status: 'SUCCESS' | 'FAILED' }> {
+  const server = getSorobanRpc(network);
+  let txToSend = preparedTx;
 
-    const eventsRes = await server.getEvents({
-      startLedger,
-      filters: [
-        {
-          type: 'contract',
-          contractIds: [contractId],
-        },
-      ],
-      limit: 15,
+  const isFreighter = await isFreighterConnected().catch(() => false);
+
+  if (isFreighter && callerAddress !== DEMO_TESTNET_KEYPAIR.publicKey) {
+    const signedRes: any = await signTransaction(preparedTx.toXDR(), {
+      networkPassphrase: STELLAR_CONFIG[network].passphrase,
     });
+    const xdrString = typeof signedRes === 'string' ? signedRes : signedRes?.signedTxXdr || preparedTx.toXDR();
+    txToSend = TransactionBuilder.fromXDR(xdrString, STELLAR_CONFIG[network].passphrase);
 
-    const parsed: OnChainEvent[] = (eventsRes.events || []).map((e) => {
-      const topic = (e.topic || []).map((t) => {
-        try {
-          return String(scValToNative(t as unknown as xdr.ScVal));
-        } catch {
-          return String(t);
-        }
-      });
+  } else {
+    // Sign with live funded Testnet demo keypair
+    const kp = Keypair.fromSecret(DEMO_TESTNET_KEYPAIR.secret);
+    txToSend.sign(kp);
+  }
 
-      let data: unknown = null;
-      try {
-        data = scValToNative(e.value as unknown as xdr.ScVal);
-      } catch {
-        data = e.value;
-      }
+  const sendRes = await server.sendTransaction(txToSend);
+  if (sendRes.status === 'ERROR') {
+    throw new Error(sendRes.errorResult?.toString() || 'Transaction rejected by Soroban RPC node');
+  }
 
-      return {
-        id: e.id,
-        topic,
-        data,
-        ledger: e.ledger,
-        ledgerClosedAt: e.ledgerClosedAt,
-      };
-    });
+  const txHash = sendRes.hash;
+  const pollRes = await server.pollTransaction(txHash, { attempts: 25 });
 
-    return parsed;
-  } catch (err) {
-    console.warn('Failed to fetch Soroban contract events:', err);
-    return [];
+  if (pollRes.status === 'SUCCESS') {
+    return { txHash, status: 'SUCCESS' };
+  } else {
+    throw new Error(`Transaction finished with status ${pollRes.status}`);
   }
 }
 
 /**
- * Builds and prepares a live on-chain purchase transaction ready for Freighter signing
+ * Executes a REAL on-chain purchase transaction on Soroban
  */
-export async function buildPurchaseTx({
+export async function executePurchase({
   buyerAddress,
   itemId,
   contractId = TESTNET_CONTRACT_ID,
@@ -270,14 +249,14 @@ export async function buildPurchaseTx({
   contractId?: string;
   paymentToken?: string;
   network?: StellarNetwork;
-}): Promise<{ xdrBase64: string }> {
+}): Promise<{ txHash: string; status: string }> {
   const tokenToUse = paymentToken || getNativeSacAddress(network);
   const server = getSorobanRpc(network);
   const buyerAcc = await server.getAccount(buyerAddress);
   const contract = new Contract(contractId);
 
   const baseTx = new TransactionBuilder(buyerAcc, {
-    fee: '2000',
+    fee: '15000',
     networkPassphrase: STELLAR_CONFIG[network].passphrase,
   })
     .addOperation(
@@ -292,13 +271,13 @@ export async function buildPurchaseTx({
     .build();
 
   const preparedTx = await server.prepareTransaction(baseTx);
-  return { xdrBase64: preparedTx.toXDR() };
+  return await signAndSubmitTx(preparedTx, buyerAddress, network);
 }
 
 /**
- * Builds and prepares a live on-chain place_and_list transaction ready for Freighter signing
+ * Executes a REAL on-chain place_and_list transaction on Soroban
  */
-export async function buildPlaceAndListTx({
+export async function executePlaceAndList({
   sellerAddress,
   title,
   description = '',
@@ -314,15 +293,14 @@ export async function buildPlaceAndListTx({
   priceInXlm: number;
   contractId?: string;
   network?: StellarNetwork;
-}): Promise<{ xdrBase64: string; nextItemId?: number }> {
+}): Promise<{ txHash: string; status: string; nextItemId?: number }> {
   const server = getSorobanRpc(network);
   const sellerAcc = await server.getAccount(sellerAddress);
   const contract = new Contract(contractId);
-
-  const priceStroops = BigInt(Math.round(priceInXlm * 10_000_000));
+  const priceStroops = xlmToStroops(priceInXlm);
 
   const baseTx = new TransactionBuilder(sellerAcc, {
-    fee: '2000',
+    fee: '15000',
     networkPassphrase: STELLAR_CONFIG[network].passphrase,
   })
     .addOperation(
@@ -338,24 +316,51 @@ export async function buildPlaceAndListTx({
     .setTimeout(180)
     .build();
 
-  const sim = await server.simulateTransaction(baseTx);
-  let nextItemId: number | undefined;
-  if (rpc.Api.isSimulationSuccess(sim) && sim.result?.retval) {
-    try {
-      nextItemId = Number(scValToNative(sim.result.retval));
-    } catch {
-      // Ignore conversion
-    }
-  }
-
   const preparedTx = await server.prepareTransaction(baseTx);
-  return { xdrBase64: preparedTx.toXDR(), nextItemId };
+  const result = await signAndSubmitTx(preparedTx, sellerAddress, network);
+  return result;
 }
 
 /**
- * Builds and prepares a live on-chain set_policy transaction ready for Freighter signing
+ * Executes a REAL on-chain delist transaction on Soroban
  */
-export async function buildSetPolicyTx({
+export async function executeDelist({
+  callerAddress,
+  itemId,
+  contractId = TESTNET_CONTRACT_ID,
+  network = 'TESTNET',
+}: {
+  callerAddress: string;
+  itemId: number;
+  contractId?: string;
+  network?: StellarNetwork;
+}): Promise<{ txHash: string; status: string }> {
+  const server = getSorobanRpc(network);
+  const callerAcc = await server.getAccount(callerAddress);
+  const contract = new Contract(contractId);
+
+  const baseTx = new TransactionBuilder(callerAcc, {
+    fee: '10000',
+    networkPassphrase: STELLAR_CONFIG[network].passphrase,
+  })
+    .addOperation(
+      contract.call(
+        'delist',
+        new Address(callerAddress).toScVal(),
+        nativeToScVal(itemId, { type: 'u32' })
+      )
+    )
+    .setTimeout(180)
+    .build();
+
+  const preparedTx = await server.prepareTransaction(baseTx);
+  return await signAndSubmitTx(preparedTx, callerAddress, network);
+}
+
+/**
+ * Executes a REAL on-chain set_policy transaction on Soroban
+ */
+export async function executeSetPolicy({
   callerAddress,
   royaltyBps,
   royaltyRecipient,
@@ -371,12 +376,11 @@ export async function buildSetPolicyTx({
   upstreamSplits?: { recipient: string; shareBps: number }[];
   contractId?: string;
   network?: StellarNetwork;
-}): Promise<{ xdrBase64: string }> {
+}): Promise<{ txHash: string; status: string }> {
   const server = getSorobanRpc(network);
   const callerAcc = await server.getAccount(callerAddress);
   const contract = new Contract(contractId);
-
-  const minFloorStroops = BigInt(Math.round(minFloorPriceInXlm * 10_000_000));
+  const minFloorStroops = xlmToStroops(minFloorPriceInXlm);
 
   const scSplits = upstreamSplits.map((s) => ({
     recipient: s.recipient,
@@ -384,7 +388,7 @@ export async function buildSetPolicyTx({
   }));
 
   const baseTx = new TransactionBuilder(callerAcc, {
-    fee: '2000',
+    fee: '15000',
     networkPassphrase: STELLAR_CONFIG[network].passphrase,
   })
     .addOperation(
@@ -401,31 +405,5 @@ export async function buildSetPolicyTx({
     .build();
 
   const preparedTx = await server.prepareTransaction(baseTx);
-  return { xdrBase64: preparedTx.toXDR() };
-}
-
-/**
- * Submits a signed Soroban transaction to Stellar Testnet RPC and awaits confirmation
- */
-export async function submitSignedTx(
-  signedXdrBase64: string,
-  network: StellarNetwork = 'TESTNET'
-): Promise<{ txHash: string; status: 'SUCCESS' | 'FAILED'; error?: string }> {
-  const server = getSorobanRpc(network);
-  const tx = TransactionBuilder.fromXDR(signedXdrBase64, STELLAR_CONFIG[network].passphrase);
-
-  const sendRes = await server.sendTransaction(tx);
-  if (sendRes.status === 'ERROR') {
-    throw new Error(sendRes.errorResult?.toString() || 'Transaction rejected by Soroban RPC node');
-  }
-
-  const txHash = sendRes.hash;
-
-  // Poll for completion (up to 40 seconds)
-  const pollRes = await server.pollTransaction(txHash, { attempts: 25 });
-  if (pollRes.status === 'SUCCESS') {
-    return { txHash, status: 'SUCCESS' };
-  } else {
-    throw new Error(`Transaction finished with status ${pollRes.status}`);
-  }
+  return await signAndSubmitTx(preparedTx, callerAddress, network);
 }

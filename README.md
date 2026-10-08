@@ -61,39 +61,22 @@ The project runs as a **100% decentralized Web3 protocol** on Stellar Testnet wi
 
 ---
 
-## 🎯 Features & Modules
+## 🎯 Protocol Capabilities & Invariants
 
-### 1. 🏠 Interactive Landing Page
-* **Value Proposition:** Interactive comparison between traditional custody vs. the non-custodial Kiosk standard.
-* **Architecture Flowchart:** Dynamic step-by-step visualization of buyer, seller, policy engine, and atomic settlement.
-* **Interactive Checkout Sandbox:** Live checkout preview allowing users to inspect split calculations before buying.
+### 1. 🏛️ Non-Custodial Kiosk Vault
+* **Decentralized Storage:** Assets and listings are persisted on-chain in Soroban instance and temporary storage.
+* **Granular Ownership:** Only the seller or authorized kiosk owner can delist or modify active listings.
+* **Metadata Attachment:** Every listed item holds descriptive metadata (`title`, `description`, `asset_type`, and `price`).
 
-### 2. 🏛️ Kiosk Manager (`KioskManager`)
-* **Non-Custodial Vault:** Mint, list, or delist digital assets (Developer Passes, API Licenses, Badges, Collectibles).
-* **On-Chain Listing:** Automatically calls `place_and_list` on Soroban with asset metadata (title, description, asset type, price).
-* **Real-time Status Tracking:** Track asset status (`AVAILABLE`, `IN_ESCROW`, `SETTLED`).
-
-### 3. 🛡️ Transfer Policy Engine (`PolicyEngine`)
+### 2. 🛡️ Transfer Policy Engine
 * **Creator Royalty Enforcement:** Set minimum royalty percentages in basis points (e.g., `750 bps = 7.5%`).
-* **Multi-Recipient Upstream Splits:** Configure atomic payouts for protocol treasuries, ecosystem DAOs, or affiliate partners (e.g., `250 bps = 2.5%`).
-* **Floor Price Enforcement:** Prevents listing or purchasing below the minimum threshold on-chain.
-* **Escrow Modes:** Supports `INSTANT` atomic settlements and `TIMELOCKED` dispute periods.
+* **Multi-Recipient Upstream Splits:** Program atomic payouts for protocol treasuries, ecosystem DAOs, or affiliate partners (e.g., `250 bps = 2.5%`).
+* **Floor Price Enforcement:** Enforces minimum listing and checkout prices on-chain, preventing undervaluation exploits.
 
-### 4. 🛒 Live Soroban Marketplace (`Marketplace`)
-* **Live Catalog:** Fetches active listings directly from the deployed Soroban contract.
-* **Multi-Step Atomic Checkout:**
-  1. **Review:** Inspect price breakdown, seller payout, royalty fee, and upstream splits.
-  2. **Sign:** Request transaction signature from Freighter.
-  3. **Settle:** Submit atomic transaction envelope to Soroban Testnet RPC.
-  4. **Receipt:** View real-time settlement status with direct clickable links to [StellarExpert Explorer](https://stellar.expert).
-* **Zero Hardcoded Accounts:** Reads wallet addresses dynamically from the connected Freighter session.
-
-### 5. 🧩 Embeddable Checkout Widget (`WidgetCustomizer`)
-* **Customizer Interface:** Live preview with custom dark/light themes, accent colors, and custom button text.
-* **Drop-in Embed Code:** Generates copy-paste code for:
-  * **React Component:** `@stellarkiosk/widget`
-  * **HTML Web Component:** `<stellar-kiosk-button>`
-  * **Iframe Embed:** Standalone hosted iframe snippet.
+### 3. ⚡ Atomic Settlement Engine
+* **Single-Envelope Settlement:** Splits payments atomically across seller, creator, and upstream splits.
+* **Deterministic Fail-Safe:** If any leg of the transfer fails, the entire transaction reverts, ensuring no stranded funds.
+* **Audit Trail Events:** Emits standard Soroban topics `(KIOSK, "listed")` and `(KIOSK, "bought")`.
 
 ---
 
@@ -156,27 +139,26 @@ pub fn get_owner(env: Env) -> Result<Address, KioskError>;
 
 | Component | Technology | Version |
 | :--- | :--- | :--- |
-| **Smart Contract** | Rust (`soroban-sdk`) | `21.7.7` |
-| **Target Architecture** | WebAssembly | `wasm32v1-none` |
 | **Frontend Framework** | React + TypeScript + Vite | `18.3.1` / `5.4.2` |
-| **Styling** | Tailwind CSS + Lucide Icons | `3.4.1` |
-| **Stellar SDK** | `@stellar/stellar-sdk` | `17.2.1` |
+| **Design Language** | Axon Dark Luxury / Plus Jakarta Sans | Tailwind CSS `3.4.1` |
+| **Smart Contract** | Rust (`soroban-sdk`) | `21.7.7` |
+| **Target Architecture** | WebAssembly | `wasm32-unknown-unknown` |
 | **Wallet Connector** | `@stellar/freighter-api` | `6.0.1` |
-| **Unit & Integration Tests**| Vitest + Testing Library | `2.1.8` |
+| **Network** | Stellar Testnet | Protocol 21 |
 
 ---
 
 ## 🚀 Getting Started
 
 ### Prerequisites
-- **Node.js**: `v18.x` or later
-- **npm** or **pnpm**
-- **Freighter Wallet Extension** configured to **Testnet**
-- *(Optional for contract development)*: **Rust** with `wasm32-unknown-unknown` and `stellar-cli`
+- **Node.js**: `v18.x` or later (`node -v`)
+- **Rust Toolchain**: Latest stable Rust (`rustc --version`)
+- **WebAssembly Target**:
+  ```bash
+  rustup target add wasm32-unknown-unknown
+  ```
 
-### 1. Clone & Run (Zero-Config Out of the Box)
-
-No `.env` file or API keys are required. All network configurations and Stellar Asset Contract addresses are derived deterministically in-code.
+### 1. Run Frontend Locally (Zero-Config)
 
 ```bash
 git clone https://github.com/Najite/kiosk.git
@@ -191,26 +173,16 @@ npm run dev
 
 Open [http://localhost:5173](http://localhost:5173) in your browser.
 
-### 2. Full Verification Suite
+### 2. Build & Verify Frontend
 
 ```bash
-# Typecheck TypeScript code
-npm run typecheck
-
-# Run linter
-npm run lint
-
-# Run Vitest test suite
-npm test
-
-# Build production bundle
 npm run build
 ```
 
 ### 3. Build & Test Soroban Smart Contracts (Rust)
 
 ```bash
-# Run Rust smart contract unit tests
+# Run contract unit and integration tests
 cargo test --manifest-path contracts/kiosk/Cargo.toml
 
 # Compile optimized WebAssembly contract

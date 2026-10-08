@@ -22,6 +22,9 @@ dist-ssr
 *.sw?
 .env
 .bolt
+.vite
+*.tsbuildinfo
 target
 contracts/**/target
 contracts/**/test_snapshots
+
