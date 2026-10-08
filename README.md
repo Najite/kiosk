@@ -1,6 +1,7 @@
 # StellarKiosk 🏛️
 
-> A composable, non-custodial digital asset kiosk and policy engine for the Stellar & Soroban ecosystem.
+> **Autonomous On-Chain Asset Vault & Policy Engine on Stellar & Soroban**  
+> Non-custodial kiosk standard enforcing creator royalties, multi-recipient upstream revenue splits, floor prices, and atomic settlement escrow.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Network](https://img.shields.io/badge/Network-Stellar%20Testnet-green.svg)](https://stellar.org)
@@ -12,11 +13,15 @@
 
 ## 📌 Executive Summary
 
-Traditional Web3 commerce models force creators and developers into a custody compromise: to list or sell an asset, you must transfer custody to a third-party marketplace contract. If the marketplace is paused, compromised, or enforces zero royalties, creators lose both sovereignty and revenue.
+Traditional Web3 digital commerce forces creators and platforms into a custodial compromise: to list or monetize an asset, creators must surrender ownership to centralized or opaque marketplace contracts. If the intermediary halts operations, gets exploited, or ignores royalty standards, creators lose both custody and revenue.
 
-**StellarKiosk** brings the **Kiosk Commerce Primitive** to Stellar and Soroban. Assets remain protected in a non-custodial kiosk vault, governed by modular on-chain **Transfer Policies** (guaranteed creator royalties, multi-recipient upstream revenue splits, floor prices, and timelocked escrows). When a purchase occurs, the Soroban smart contract atomically splits payments across the seller, creator, and upstream protocol treasuries in a single ledger transaction.
+**StellarKiosk** adapts the **Kiosk Commerce Primitive** to Stellar and Soroban. Assets remain protected in a sovereign on-chain vault, governed by modular **Transfer Policies**:
+- **Creator Royalties:** Guaranteed basis-point enforcement on every sale.
+- **Upstream Splits:** Multi-recipient revenue routing (e.g., protocol treasuries, ecosystem DAOs, affiliate partners).
+- **Floor Price Guardrails:** Programmatic minimum prices preventing undervaluation exploits.
+- **Atomic Settlement Escrow:** Payments and payouts execute simultaneously in a single transaction envelope—if any payment leg fails, the entire transaction reverts.
 
-The project runs as a **100% decentralized Web3 protocol** on Stellar Testnet with **zero centralized backends or databases** (no Supabase, Firebase, or external API keys). The Stellar ledger and Soroban instance storage serve as the single source of truth.
+The protocol operates as a **100% decentralized Web3 system** directly against Stellar Testnet with **zero centralized backends or databases** (no Supabase, Firebase, or private API keys). The Stellar ledger and Soroban persistent instance storage serve as the single source of truth.
 
 ---
 
@@ -34,13 +39,13 @@ The project runs as a **100% decentralized Web3 protocol** on Stellar Testnet wi
 
 ---
 
-## 🏛️ Core Protocol Architecture
+## 🏛️ Core Protocol Architecture & Atomic Escrow
 
 ```
                     ┌────────────────────────┐
                     │     Freighter Wallet   │
                     └───────────┬────────────┘
-                                │ Signs Transaction
+                                │ Signs Invocation
                                 ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │               Soroban Smart Contract (KioskContract)            │
@@ -48,44 +53,46 @@ The project runs as a **100% decentralized Web3 protocol** on Stellar Testnet wi
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
 │  1. Buyer Authorization: buyer.require_auth()                   │
-│  2. Policy Validation: floor price & listed status checks       │
-│  3. Atomic Payment Distribution via Stellar Asset Contract:     │
-│     ├── Net Payout (90%)      ───► Seller                       │
-│     ├── Creator Royalty (7.5%) ──► Royalty Recipient            │
-│     └── Upstream Split (2.5%) ───► Protocol Treasury            │
+│  2. Policy Validation: is_listed == true && price >= floor      │
+│  3. Atomic Payment Escrow via Stellar Asset Contract (SAC):    │
+│     ├── Seller Net Payout (90%)      ───► Seller Wallet         │
+│     ├── Creator Royalty (7.5%)       ───► Royalty Recipient     │
+│     └── Upstream Protocol Split (2.5%) ──► Protocol Treasury    │
 │  4. State Transition: item.is_listed = false                    │
 │  5. Event Emitted: (KIOSK, "bought", [item_id, buyer, price])   │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
+### How the Atomic Settlement Escrow Operates
+1. **Vault Custody:** When an item is placed and listed (`place_and_list`), its metadata and ownership are recorded into the smart contract's persistent storage (`DataKey::Item(id)`).
+2. **Atomic Execution:** In `purchase()`, the contract acts as an escrow agent. It pulls payment from the buyer via the Stellar Asset Contract, computes the basis-point splits according to the active `TransferPolicy`, transfers each party's cut, and updates the listing state in a single ledger transaction envelope.
+3. **No Stranded Funds:** Because this is an atomic Soroban transaction, partial executions are impossible. Either all parties (seller, creator, upstream split) receive their funds and the item is transferred, or the entire transaction fails and reverts with no fee loss.
+
 ---
 
-## 🎯 Protocol Capabilities & Invariants
+## 💻 Application Features & Deep Linking
 
-### 1. 🏛️ Non-Custodial Kiosk Vault
-* **Decentralized Storage:** Assets and listings are persisted on-chain in Soroban instance and temporary storage.
-* **Granular Ownership:** Only the seller or authorized kiosk owner can delist or modify active listings.
-* **Metadata Attachment:** Every listed item holds descriptive metadata (`title`, `description`, `asset_type`, and `price`).
+The frontend is built with an **Axon-inspired Dark Luxury** aesthetic, featuring obsidian glassmorphism, double-bezel card architecture, interactive telemetry, and full deep-link routing:
 
-### 2. 🛡️ Transfer Policy Engine
-* **Creator Royalty Enforcement:** Set minimum royalty percentages in basis points (e.g., `750 bps = 7.5%`).
-* **Multi-Recipient Upstream Splits:** Program atomic payouts for protocol treasuries, ecosystem DAOs, or affiliate partners (e.g., `250 bps = 2.5%`).
-* **Floor Price Enforcement:** Enforces minimum listing and checkout prices on-chain, preventing undervaluation exploits.
+| Route | View | Description |
+| :--- | :--- | :--- |
+| `/` | **Protocol Overview** | Hero showcase, live telemetry bar, interactive policy simulator, and contract preview. |
+| `/marketplace` | **Live Marketplace** | Browse on-chain items with category filtering (Licenses, Passes, Credentials, Collectibles), real-time search, and on-chain checkout modal. |
+| `/vault` | **Kiosk Vault** | Non-custodial asset manager. Mint and list new items directly to Soroban storage, or delist items with seller authorization. |
+| `/policy` | **Policy Engine** | Audit and update on-chain transfer policies: creator royalty BPS, minimum floor prices, and multi-recipient upstream revenue splits. |
+| `/embed` | **Widget Embed & SDK** | Plug-and-play React and Vanilla JS code snippets for developers to embed kiosk checkouts directly into third-party dApps. |
 
-### 3. ⚡ Atomic Settlement Engine
-* **Single-Envelope Settlement:** Splits payments atomically across seller, creator, and upstream splits.
-* **Deterministic Fail-Safe:** If any leg of the transfer fails, the entire transaction reverts, ensuring no stranded funds.
-* **Audit Trail Events:** Emits standard Soroban topics `(KIOSK, "listed")` and `(KIOSK, "bought")`.
+> **State Persistence:** All routes use the HTML5 History API (`window.history.pushState`). Refreshing from any page (e.g. `/vault` or `/marketplace`) persists the active view, and browser Back/Forward navigation operates seamlessly.
 
 ---
 
 ## 🦀 Soroban Smart Contract Reference (`contracts/kiosk`)
 
-The Rust smart contract implements the following entry points:
+The core Rust contract implements the following entry points:
 
 ```rust
-// Initialize kiosk with owner, royalty policy, and upstream split recipients
+// Initialize kiosk with admin owner, royalty policy, and upstream split recipients
 pub fn initialize(
     env: Env,
     owner: Address,
@@ -95,7 +102,7 @@ pub fn initialize(
     upstream_splits: Vec<UpstreamSplit>,
 ) -> Result<(), KioskError>;
 
-// Update transfer policy with caller authentication
+// Update transfer policy (requires kiosk owner authorization)
 pub fn set_policy(
     env: Env,
     caller: Address,
@@ -105,7 +112,7 @@ pub fn set_policy(
     upstream_splits: Vec<UpstreamSplit>,
 ) -> Result<(), KioskError>;
 
-// Place and list asset into persistent storage with metadata
+// Place and list asset into contract storage with metadata (seller auth required)
 pub fn place_and_list(
     env: Env,
     seller: Address,
@@ -115,7 +122,7 @@ pub fn place_and_list(
     price: i128,
 ) -> Result<u32, KioskError>;
 
-// Delist an item (requires seller auth)
+// Delist an item (requires seller authorization)
 pub fn delist(env: Env, caller: Address, item_id: u32) -> Result<(), KioskError>;
 
 // Atomically execute purchase, payouts, royalties, and upstream splits
@@ -141,9 +148,11 @@ pub fn get_owner(env: Env) -> Result<Address, KioskError>;
 | :--- | :--- | :--- |
 | **Frontend Framework** | React + TypeScript + Vite | `18.3.1` / `5.4.2` |
 | **Design Language** | Axon Dark Luxury / Plus Jakarta Sans | Tailwind CSS `3.4.1` |
+| **Icons** | Lucide React | `0.344.0` |
 | **Smart Contract** | Rust (`soroban-sdk`) | `21.7.7` |
 | **Target Architecture** | WebAssembly | `wasm32-unknown-unknown` |
 | **Wallet Connector** | `@stellar/freighter-api` | `6.0.1` |
+| **Stellar SDK** | `@stellar/stellar-sdk` | `13.3.0` |
 | **Network** | Stellar Testnet | Protocol 21 |
 
 ---
@@ -179,7 +188,7 @@ Open [http://localhost:5173](http://localhost:5173) in your browser.
 npm run build
 ```
 
-### 3. Build & Test Soroban Smart Contracts (Rust)
+### 3. Run Soroban Smart Contract Tests
 
 ```bash
 # Run contract unit and integration tests
@@ -191,19 +200,19 @@ cargo build --manifest-path contracts/kiosk/Cargo.toml --target wasm32-unknown-u
 
 ---
 
-## 🤝 Contributing
+## 🔒 Security & Verification Guarantees
 
-We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for full setup instructions, architecture notes, and contribution guidelines. Check out the issues backlog in [`.github/ISSUES.md`](.github/ISSUES.md).
+1. **Non-Custodial Sovereignty:** Digital assets are never entrusted to a centralized third party. Only the seller can delist, and only the policy-compliant atomic checkout can transfer items.
+2. **Atomic Upstream Splits:** Upstream splits (such as the protocol treasury or developer DAOs) are settled in the exact same transaction envelope as the seller and creator payouts. If any leg fails, the entire transaction reverts.
+3. **No Hardcoded Keys:** All user signatures dynamically authenticate the connected Freighter wallet. A deterministic fallback keypair is available for local testnet verification when Freighter is unavailable.
+4. **Deterministic Token Standards:** Native Stellar Asset Contract (SAC) addresses for Testnet and Mainnet are derived directly from the protocol.
+5. **On-Chain Audit Events:** All actions emit standard Soroban topics `(KIOSK, "listed")` and `(KIOSK, "bought")`, verifiable on [Stellar.Expert](https://stellar.expert/explorer/testnet/contract/CB3AQGQ6MXJVJ26ICU5CDIGSVUKS2LNCEBMZEVM2GO6RARSJ367CLQQB).
 
 ---
 
-## 🔒 Security & Verification Guarantees
+## 🤝 Contributing
 
-1. **Non-Custodial Invariants:** Digital assets are never entrusted to an intermediary third party; only the atomic settlement condition defined by the policy can unlock or transfer items.
-2. **Atomic Upstream Splits:** Upstream recipients (e.g. Protocol Treasury) receive their programmed share in the exact same transaction envelope as the seller and creator. If any transfer fails, the entire transaction reverts.
-3. **No Hardcoded Accounts:** All signatures and transactions dynamically identify the connected Freighter account.
-4. **Deterministic Token Standards:** Native Stellar Asset Contract (SAC) addresses for Testnet and Mainnet are derived automatically from the network rather than brittle environment configurations.
-5. **On-Chain Event Verification:** All listing and purchase actions emit standard Soroban events `(KIOSK, "listed")` and `(KIOSK, "bought")` indexed on Stellar block explorers.
+We welcome community contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for full setup instructions, architecture notes, and contribution guidelines.
 
 ---
 

@@ -15,6 +15,7 @@ import { fetchAllContractItems, fetchContractPolicy } from './lib/soroban';
 import { stroopsToXlm } from './lib/stellar';
 import { ListingItem, TransferPolicy, AssetCategory } from './types';
 import { CheckCircle2, RefreshCw } from 'lucide-react';
+import { getTabFromUrl, navigateToTab, TabId, TABS } from './lib/navigation';
 
 const FALLBACK_POLICY: TransferPolicy = {
   owner: 'GD54GYI3SRVER7O56DLEXZEXQ2UJVXIOOXZYVV5ITCZ4MOEJ3XFLXNVO',
@@ -32,7 +33,37 @@ const FALLBACK_POLICY: TransferPolicy = {
 
 export function AppContent() {
   const { address } = useWallet();
-  const [activeTab, setActiveTab] = useState<string>('overview');
+  const [activeTab, setActiveTabState] = useState<TabId>(() => getTabFromUrl());
+
+  const setActiveTab = useCallback((tab: string, replace = false) => {
+    const matched = TABS.find((t) => t.id === tab);
+    const tabId: TabId = matched ? matched.id : 'overview';
+    setActiveTabState(tabId);
+    navigateToTab(tabId, replace);
+  }, []);
+
+  // Listen to browser Back/Forward (popstate) and hash changes
+  useEffect(() => {
+    const handleLocationChange = () => {
+      const currentTab = getTabFromUrl();
+      setActiveTabState(currentTab);
+      const tabConfig = TABS.find((t) => t.id === currentTab) || TABS[0];
+      document.title = tabConfig.title;
+    };
+
+    // Set initial document title matching current tab
+    const initialConfig = TABS.find((t) => t.id === activeTab) || TABS[0];
+    document.title = initialConfig.title;
+
+    window.addEventListener('popstate', handleLocationChange);
+    window.addEventListener('hashchange', handleLocationChange);
+
+    return () => {
+      window.removeEventListener('popstate', handleLocationChange);
+      window.removeEventListener('hashchange', handleLocationChange);
+    };
+  }, [activeTab]);
+
   const [items, setItems] = useState<ListingItem[]>([]);
   const [policy, setPolicy] = useState<TransferPolicy>(FALLBACK_POLICY);
   const [isLoadingOnChain, setIsLoadingOnChain] = useState<boolean>(true);

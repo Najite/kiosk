@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useWallet } from '../context/WalletContext';
 import { Shield, Sparkles, Wallet, ExternalLink, Menu, X, ArrowUpRight } from 'lucide-react';
+import { TABS } from '../lib/navigation';
 
 interface NavbarProps {
   activeTab: string;
@@ -16,13 +17,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   const { isConnected, shortAddress, balance } = useWallet();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  const navItems = [
-    { id: 'overview', label: 'Protocol' },
-    { id: 'marketplace', label: 'Marketplace' },
-    { id: 'vault', label: 'Kiosk Vault' },
-    { id: 'policy', label: 'Policy Engine' },
-    { id: 'embed', label: 'Widget Embed' },
-  ];
+  const navItems = TABS;
 
   return (
     <header className="sticky top-0 z-40 w-full px-4 sm:px-6 lg:px-8 pt-4 pb-2 pointer-events-none">
@@ -30,8 +25,12 @@ export const Navbar: React.FC<NavbarProps> = ({
         {/* Floating Glass Island Bar */}
         <div className="w-full flex items-center justify-between px-4 sm:px-6 py-3 rounded-full bg-[#08080c]/80 backdrop-blur-xl border border-white/10 shadow-[0_10px_30px_rgba(0,0,0,0.8)] pointer-events-auto">
           {/* Logo / Brand */}
-          <button
-            onClick={() => setActiveTab('overview')}
+          <a
+            href="/"
+            onClick={(e) => {
+              e.preventDefault();
+              setActiveTab('overview');
+            }}
             className="flex items-center gap-3 text-left group transition-all"
           >
             <div className="relative w-9 h-9 rounded-full bg-gradient-to-tr from-purple-900 to-violet-600 flex items-center justify-center border border-purple-400/30 shadow-[0_0_15px_rgba(168,85,247,0.35)] group-hover:scale-105 transition-transform duration-300">
@@ -46,16 +45,20 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-purple-500/10 text-purple-300 border border-purple-500/20">v21</span>
               </div>
             </div>
-          </button>
+          </a>
 
           {/* Desktop Navigation Links */}
           <nav className="hidden md:flex items-center gap-1 bg-[#101018]/60 p-1 rounded-full border border-white/5">
             {navItems.map((item) => {
               const active = activeTab === item.id;
               return (
-                <button
+                <a
                   key={item.id}
-                  onClick={() => setActiveTab(item.id)}
+                  href={item.path}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setActiveTab(item.id);
+                  }}
                   className={`px-4 py-1.5 rounded-full text-xs font-medium transition-all duration-300 ${
                     active
                       ? 'bg-gradient-to-r from-purple-600 to-violet-600 text-white shadow-[0_0_15px_rgba(168,85,247,0.4)]'
@@ -63,7 +66,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   }`}
                 >
                   {item.label}
-                </button>
+                </a>
               );
             })}
           </nav>
@@ -139,9 +142,11 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           <div className="flex flex-col gap-3 py-6">
             {navItems.map((item) => (
-              <button
+              <a
                 key={item.id}
-                onClick={() => {
+                href={item.path}
+                onClick={(e) => {
+                  e.preventDefault();
                   setActiveTab(item.id);
                   setMobileMenuOpen(false);
                 }}
@@ -152,7 +157,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 }`}
               >
                 {item.label}
-              </button>
+              </a>
             ))}
           </div>
 
