@@ -25,7 +25,7 @@ There are no middlemen, no private databases, and no off-chain servers holding y
 
 ---
 
-## Core Capabilities (In Plain English)
+## Core Capabilities
 
 | Feature | What It Means | Why It Matters |
 | :--- | :--- | :--- |
