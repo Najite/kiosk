@@ -13,14 +13,46 @@ export const NATIVE_SAC: Record<StellarNetwork, string> = {
 };
 
 // Deployed testnet kiosk smart contract ID
-export const DEFAULT_TESTNET_SHOWCASE_KIOSK = 'CB3AQGQ6MXJVJ26ICU5CDIGSVUKS2LNCEBMZEVM2GO6RARSJ367CLQQB';
+export const DEFAULT_TESTNET_SHOWCASE_KIOSK = 'CDRKM3ZZXKJQ7VHCQUBO3BZWS3NDPWHSVSNDXX54ZFWEW3AMSI224T4R';
 export const TESTNET_CONTRACT_ID = DEFAULT_TESTNET_SHOWCASE_KIOSK;
 
-// Live funded Testnet account for instant browser execution without extension
-export const DEMO_TESTNET_KEYPAIR = {
-  publicKey: 'GD4RTK3MUD7HRISAQHRFRU7GJWC7OQA7VKDQLAMYZE54OZ6FLFH7K5F2',
-  secret: 'SC6DEVIYGNCEETKN4K5Q2AUNMHCIGDHCMULYOP3E6H3JBSNVEHPSTJLS',
-};
+const EPHEMERAL_KEY_STORAGE = 'kiosk_ephemeral_testnet_secret';
+
+/**
+ * Retrieve ephemeral burner keypair stored in browser session (if any)
+ */
+export function getEphemeralKeypair(): Keypair | null {
+  if (typeof window === 'undefined') return null;
+  const secret = window.sessionStorage?.getItem(EPHEMERAL_KEY_STORAGE);
+  if (!secret) return null;
+  try {
+    return Keypair.fromSecret(secret);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Create or retrieve an ephemeral burner testnet keypair (generated client-side, never hardcoded)
+ */
+export function getOrCreateEphemeralKeypair(): Keypair {
+  const existing = getEphemeralKeypair();
+  if (existing) return existing;
+  const created = Keypair.random();
+  if (typeof window !== 'undefined' && window.sessionStorage) {
+    window.sessionStorage.setItem(EPHEMERAL_KEY_STORAGE, created.secret());
+  }
+  return created;
+}
+
+/**
+ * Clear ephemeral burner testnet keypair
+ */
+export function clearEphemeralKeypair(): void {
+  if (typeof window !== 'undefined' && window.sessionStorage) {
+    window.sessionStorage.removeItem(EPHEMERAL_KEY_STORAGE);
+  }
+}
 
 export const STELLAR_CONFIG = {
   TESTNET: {

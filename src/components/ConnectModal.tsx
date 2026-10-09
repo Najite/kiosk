@@ -130,11 +130,11 @@ export const ConnectModal: React.FC<ConnectModalProps> = ({ isOpen, onClose }) =
                     <Shield className="w-5 h-5" />
                   </div>
                   <div>
-                    <div className="text-sm font-bold text-white">Genesis Protocol Account</div>
-                    <div className="text-[11px] text-zinc-400">Instant Testnet creator session (Zero setup)</div>
+                    <div className="text-sm font-bold text-white">Ephemeral Testnet Wallet</div>
+                    <div className="text-[11px] text-zinc-400">Browser-generated burner keypair (Friendbot funded)</div>
                   </div>
                 </div>
-                <div className="text-xs font-mono text-purple-400">Demo</div>
+                <div className="text-xs font-mono text-purple-400">Testnet</div>
               </button>
             </div>
           )}

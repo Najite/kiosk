@@ -24,7 +24,7 @@ Before you begin, ensure you have the following installed on your machine:
 
 ### 1. Clone the repository
 ```bash
-git clone https://github.com/Najite/kiosk.git
+git clone https://github.com/luxver/kiosk.git
 cd kiosk
 ```
 
@@ -36,6 +36,12 @@ All PRs must pass the automated verification suite before being merged:
 
 ### Smart Contract Verification
 ```bash
+# Code formatting check
+cargo fmt --check
+
+# Linter checks (zero warnings allowed)
+cargo clippy --all-targets --all-features -- -D warnings
+
 # Check contract compilation
 cargo check --manifest-path contracts/kiosk/Cargo.toml --tests
 

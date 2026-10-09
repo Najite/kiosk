@@ -1,6 +1,12 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { isConnected as checkFreighter, requestAccess, getAddress } from '@stellar/freighter-api';
-import { fetchLiveAccount, fundTestnetAccount, shortAddress, DEMO_TESTNET_KEYPAIR } from '../lib/stellar';
+import {
+  fetchLiveAccount,
+  fundTestnetAccount,
+  shortAddress,
+  getOrCreateEphemeralKeypair,
+  clearEphemeralKeypair,
+} from '../lib/stellar';
 
 interface WalletContextType {
   isConnected: boolean;
@@ -21,7 +27,7 @@ const WalletContext = createContext<WalletContextType | undefined>(undefined);
 
 export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [address, setAddress] = useState<string | null>(() => {
-    return localStorage.getItem('kiosk_wallet_address') || DEMO_TESTNET_KEYPAIR.publicKey;
+    return localStorage.getItem('kiosk_wallet_address') || null;
   });
   const [balance, setBalance] = useState<number>(0);
   const [isFreighterAvailable, setIsFreighterAvailable] = useState<boolean>(false);
@@ -84,15 +90,21 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   const connectDemoWallet = async () => {
-    const demoAddr = DEMO_TESTNET_KEYPAIR.publicKey;
+    const kp = getOrCreateEphemeralKeypair();
+    const demoAddr = kp.publicKey();
     setAddress(demoAddr);
     localStorage.setItem('kiosk_wallet_address', demoAddr);
+    const acc = await fetchLiveAccount(demoAddr, 'TESTNET');
+    if (!acc.exists) {
+      await fundTestnetAccount(demoAddr);
+    }
     await refreshBalance();
   };
 
   const disconnectWallet = () => {
     setAddress(null);
     localStorage.removeItem('kiosk_wallet_address');
+    clearEphemeralKeypair();
     setBalance(0);
   };
 
