@@ -33,38 +33,34 @@ Everything happens in **one single blockchain transaction**. If any part of the 
 
 ## Architecture & How It Works
 
-### 1. System Overview
+### 1. System Topology
 
-```
-[ Frontend: React + Vite + Freighter Wallet ]
-                      │
-                      ▼ HTTPS / JSON-RPC
-[ Stellar RPC: Horizon API + Soroban RPC ]
-                      │
-                      ▼ On-Chain Invocation
-┌────────────────────────────────────────────────────────┐
-│             Kiosk Contract (Soroban / Rust)            │
-│                                                        │
-│  • Escrow Vault: Safely holds deposited tokens         │
-│  • Listing Registry: Tracks prices & bound currencies  │
-│  • Policy Engine: Enforces royalties & treasury splits │
-└───────────┬────────────────────────────────┬───────────┘
-            │ Transfers Escrowed Asset       │ Routes Payment
-            ▼                                ▼
-[ Asset Token (CA2B4...6WQAA) ]    [ Native XLM SAC (CDLZF...GCYSC) ]
- (Delivered to Buyer)               (Buyer ──► Creator, Split & Seller)
-```
+![System Architecture](docs/images/system_architecture.svg)
 
-### 2. Item Lifecycle
+* **Client Tier:** React 18 + Vite frontend interfacing with the Freighter browser wallet extension (`@stellar/freighter-api`) or an ephemeral in-memory testnet session.
+* **Network Tier:** Communicates directly with public Stellar nodes—Soroban RPC (`simulateTransaction`, `sendTransaction`, `pollTransaction`) and Horizon API (`/accounts` balances and sequence numbers).
+* **Smart Contract Tier:** `KioskContract` on Soroban managing escrowed assets, active listings, and customizable transfer policies. Interacts via `token::Client` with both the payment token (Native XLM SAC) and escrowed asset tokens.
 
-* **Placed:** Tokens are deposited into the Kiosk contract custody. The seller still owns the item and can withdraw it anytime.
-* **Listed:** The seller puts the item up for sale with a price and accepted token (e.g. XLM). Floor price rules are enforced.
-* **Sold:** A buyer purchases the item. Royalties and splits route automatically, and the tokens transfer to the buyer's wallet.
+### 2. Atomic Settlement Engine
 
-### 3. Soroban Storage Model
+![Atomic Settlement Flow](docs/images/atomic_settlement.svg)
 
-* **Instance Storage:** Holds global protocol state (`Owner`, `DefaultPolicy`, `ItemCount`).
-* **Persistent Storage:** Holds item listings (`DataKey::Item(id)`) and collection-specific policy overrides (`DataKey::AssetPolicy(address)`). When an item is withdrawn, its storage entry is deleted to reclaim state rent.
+When a buyer calls `purchase(buyer, item_id)`:
+1. **Validation:** Checks buyer authorization, listing status, and resolves the effective collection transfer policy.
+2. **Fee Math:** Calculates creator royalties and upstream splits in basis points (e.g., 500 BPS = 5%).
+3. **Atomic Multi-Transfer:** The contract routes payment directly from the buyer to the creator, the treasury splits, and the seller payout, then delivers the escrowed asset tokens to the buyer.
+4. **Revert Protection:** If any payment or transfer leg fails, the entire transaction reverts. No assets or funds change hands.
+
+### 3. Item Lifecycle & Storage Architecture
+
+![Item Lifecycle & Storage](docs/images/item_lifecycle.svg)
+
+* **Placed (`ItemStatus::Placed`):** Tokens are deposited into the Kiosk escrow vault. `is_listed = false`. The seller retains full ownership and can withdraw anytime.
+* **Listed (`ItemStatus::Listed`):** Item is active on the marketplace with a bound payment currency. Price is verified against the minimum floor price guardrail (`price >= min_floor_price`). Withdrawals are blocked while listed.
+* **Sold (`ItemStatus::Sold`):** The asset is transferred to the buyer's wallet, and ownership is updated (`item.seller = buyer`). Sold items cannot be repurchased or withdrawn.
+* **Storage Allocation:**
+  - **Instance Storage (`env.storage().instance()`):** Holds protocol-wide settings (`Owner`, `DefaultPolicy`, `ItemCount`).
+  - **Persistent Storage (`env.storage().persistent()`):** Holds independent item listings (`DataKey::Item(id)`) and collection overrides (`DataKey::AssetPolicy(address)`). Entries are removed upon withdrawal to reclaim state rent.
 
 ---
 

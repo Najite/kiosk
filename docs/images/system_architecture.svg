@@ -1,0 +1,113 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 520" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#09090f" />
+      <stop offset="100%" stop-color="#0e0e1a" />
+    </linearGradient>
+    <linearGradient id="purpleGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#9333ea" />
+      <stop offset="100%" stop-color="#6366f1" />
+    </linearGradient>
+    <linearGradient id="cardGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#151524" stop-opacity="0.9" />
+      <stop offset="100%" stop-color="#10101c" stop-opacity="0.9" />
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="8" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <!-- Background Canvas -->
+  <rect width="960" height="520" rx="16" fill="url(#bgGrad)" stroke="#232338" stroke-width="1.5" />
+
+  <!-- Title Badge -->
+  <rect x="360" y="24" width="240" height="30" rx="15" fill="#1e1338" stroke="#7e22ce" stroke-width="1" />
+  <text x="480" y="44" fill="#c084fc" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="12" font-weight="700" text-anchor="middle" letter-spacing="1">SYSTEM TOPOLOGY &amp; ARCHITECTURE</text>
+
+  <!-- TIER 1: CLIENT LAYER -->
+  <g transform="translate(40, 75)">
+    <rect width="880" height="95" rx="12" fill="url(#cardGrad)" stroke="#2d2d48" stroke-width="1" />
+    <rect x="20" y="-10" width="100" height="20" rx="6" fill="#1e1b4b" stroke="#4338ca" stroke-width="1" />
+    <text x="70" y="4" fill="#a5b4fc" font-family="-apple-system, sans-serif" font-size="10" font-weight="700" text-anchor="middle">CLIENT TIER</text>
+
+    <!-- Sub-box 1: React Web App -->
+    <rect x="20" y="22" width="410" height="55" rx="8" fill="#18182b" stroke="#373756" stroke-width="1" />
+    <text x="36" y="42" fill="#ffffff" font-family="-apple-system, sans-serif" font-size="13" font-weight="700">React 18 + Vite Web Application</text>
+    <text x="36" y="62" fill="#94a3b8" font-family="-apple-system, sans-serif" font-size="11">Marketplace (/marketplace) • Kiosk Vault (/vault) • Policy Engine (/policy)</text>
+
+    <!-- Sub-box 2: Freighter Wallet -->
+    <rect x="450" y="22" width="410" height="55" rx="8" fill="#18182b" stroke="#373756" stroke-width="1" />
+    <text x="466" y="42" fill="#ffffff" font-family="-apple-system, sans-serif" font-size="13" font-weight="700">Freighter Wallet / Burner Keypair</text>
+    <text x="466" y="62" fill="#94a3b8" font-family="-apple-system, sans-serif" font-size="11">@stellar/freighter-api • 1-Click addToken • In-memory Testnet Fallback</text>
+  </g>
+
+  <!-- Arrow 1 -> 2 -->
+  <g transform="translate(480, 172)">
+    <line x1="0" y1="0" x2="0" y2="24" stroke="#a855f7" stroke-width="2" stroke-dasharray="4,3" />
+    <polygon points="-4,22 4,22 0,28" fill="#a855f7" />
+    <text x="12" y="16" fill="#c084fc" font-family="monospace" font-size="10">HTTPS / JSON-RPC</text>
+  </g>
+
+  <!-- TIER 2: RPC GATEWAY LAYER -->
+  <g transform="translate(40, 204)">
+    <rect width="880" height="85" rx="12" fill="url(#cardGrad)" stroke="#2d2d48" stroke-width="1" />
+    <rect x="20" y="-10" width="130" height="20" rx="6" fill="#042f2e" stroke="#0f766e" stroke-width="1" />
+    <text x="85" y="4" fill="#5eead4" font-family="-apple-system, sans-serif" font-size="10" font-weight="700" text-anchor="middle">STELLAR RPC GATEWAY</text>
+
+    <!-- Sub-box 1: Soroban RPC -->
+    <rect x="20" y="20" width="410" height="50" rx="8" fill="#18182b" stroke="#373756" stroke-width="1" />
+    <text x="36" y="38" fill="#38bdf8" font-family="-apple-system, sans-serif" font-size="12" font-weight="700">Soroban RPC (soroban-testnet.stellar.org)</text>
+    <text x="36" y="56" fill="#94a3b8" font-family="-apple-system, sans-serif" font-size="10">simulateTransaction (Reads) • sendTransaction (XDR) • pollTransaction</text>
+
+    <!-- Sub-box 2: Horizon API -->
+    <rect x="450" y="20" width="410" height="50" rx="8" fill="#18182b" stroke="#373756" stroke-width="1" />
+    <text x="466" y="38" fill="#2dd4bf" font-family="-apple-system, sans-serif" font-size="12" font-weight="700">Horizon API (horizon-testnet.stellar.org)</text>
+    <text x="466" y="56" fill="#94a3b8" font-family="-apple-system, sans-serif" font-size="10">/accounts (Sequence, XLM SAC Balance) • Friendbot Testnet Faucet</text>
+  </g>
+
+  <!-- Arrow 2 -> 3 -->
+  <g transform="translate(480, 291)">
+    <line x1="0" y1="0" x2="0" y2="24" stroke="#06b6d4" stroke-width="2" stroke-dasharray="4,3" />
+    <polygon points="-4,22 4,22 0,28" fill="#06b6d4" />
+    <text x="12" y="16" fill="#38bdf8" font-family="monospace" font-size="10">Ledger Invocation</text>
+  </g>
+
+  <!-- TIER 3: ON-CHAIN SMART CONTRACTS LAYER -->
+  <g transform="translate(40, 320)">
+    <rect width="880" height="170" rx="12" fill="url(#cardGrad)" stroke="#3b2b58" stroke-width="1.5" />
+    <rect x="20" y="-10" width="180" height="20" rx="6" fill="#3b0764" stroke="#9333ea" stroke-width="1" />
+    <text x="110" y="4" fill="#e9d5ff" font-family="-apple-system, sans-serif" font-size="10" font-weight="700" text-anchor="middle">SOROBAN SMART CONTRACT TIER</text>
+
+    <!-- Main Contract: KioskContract -->
+    <rect x="20" y="22" width="460" height="130" rx="10" fill="#1b142e" stroke="#7e22ce" stroke-width="1" />
+    <text x="36" y="44" fill="#ffffff" font-family="-apple-system, sans-serif" font-size="13" font-weight="700">Kiosk Protocol Contract</text>
+    <text x="210" y="44" fill="#c084fc" font-family="monospace" font-size="10">CDRKM3ZZ...SI224T4R</text>
+
+    <line x1="36" y1="55" x2="460" y2="55" stroke="#3b2b58" stroke-width="1" />
+
+    <text x="36" y="74" fill="#d8b4fe" font-family="-apple-system, sans-serif" font-size="11" font-weight="600">• Escrow Vault Custody:</text>
+    <text x="175" y="74" fill="#94a3b8" font-family="-apple-system, sans-serif" font-size="11">Holds tokens via place() / withdraw()</text>
+
+    <text x="36" y="96" fill="#d8b4fe" font-family="-apple-system, sans-serif" font-size="11" font-weight="600">• Listing Registry:</text>
+    <text x="145" y="96" fill="#94a3b8" font-family="-apple-system, sans-serif" font-size="11">Tracks price, bound payment token, status</text>
+
+    <text x="36" y="118" fill="#d8b4fe" font-family="-apple-system, sans-serif" font-size="11" font-weight="600">• Policy Engine:</text>
+    <text x="135" y="118" fill="#94a3b8" font-family="-apple-system, sans-serif" font-size="11">Enforces royalties, floor prices, upstream splits</text>
+
+    <text x="36" y="140" fill="#d8b4fe" font-family="-apple-system, sans-serif" font-size="11" font-weight="600">• Atomic Settlement:</text>
+    <text x="165" y="140" fill="#94a3b8" font-family="-apple-system, sans-serif" font-size="11">Executes multi-party purchase() in 1 tx</text>
+
+    <!-- Cross-contract Interaction 1: Native SAC -->
+    <rect x="500" y="22" width="360" height="60" rx="8" fill="#161e2e" stroke="#1e3a5f" stroke-width="1" />
+    <text x="516" y="42" fill="#38bdf8" font-family="-apple-system, sans-serif" font-size="12" font-weight="700">Native XLM SAC Contract</text>
+    <text x="680" y="42" fill="#94a3b8" font-family="monospace" font-size="10">CDLZFC3S...GCYSC</text>
+    <text x="516" y="64" fill="#64748b" font-family="-apple-system, sans-serif" font-size="10">Settlement currency: Buyer ──► Creator, Splits, Seller</text>
+
+    <!-- Cross-contract Interaction 2: Asset Token -->
+    <rect x="500" y="92" width="360" height="60" rx="8" fill="#1b1c2b" stroke="#382d54" stroke-width="1" />
+    <text x="516" y="112" fill="#a78bfa" font-family="-apple-system, sans-serif" font-size="12" font-weight="700">Custom Asset Token (SEP-0041)</text>
+    <text x="705" y="112" fill="#94a3b8" font-family="monospace" font-size="10">CA2B4QI5...6WQAA</text>
+    <text x="516" y="134" fill="#64748b" font-family="-apple-system, sans-serif" font-size="10">Escrowed asset: Contract Vault ──► Delivered to Buyer</text>
+  </g>
+</svg>
