@@ -12,16 +12,12 @@ export const NATIVE_SAC: Record<StellarNetwork, string> = {
   MAINNET: 'CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EZH7JPMCXL',
 };
 
-// Configurable testnet kiosk smart contract ID
-export const DEFAULT_TESTNET_SHOWCASE_KIOSK =
-  (typeof import.meta !== 'undefined' && import.meta.env?.VITE_KIOSK_CONTRACT_ID) ||
-  'CDRKM3ZZXKJQ7VHCQUBO3BZWS3NDPWHSVSNDXX54ZFWEW3AMSI224T4R';
-export const TESTNET_CONTRACT_ID = DEFAULT_TESTNET_SHOWCASE_KIOSK;
+// Live Stellar Testnet Kiosk Marketplace Smart Contract ID
+export const TESTNET_CONTRACT_ID = 'CDRKM3ZZXKJQ7VHCQUBO3BZWS3NDPWHSVSNDXX54ZFWEW3AMSI224T4R';
+export const DEFAULT_TESTNET_SHOWCASE_KIOSK = TESTNET_CONTRACT_ID;
 
-// Configurable standard SEP-0041 Soroban token asset contract ID
-export const DEFAULT_TESTNET_ASSET_CONTRACT =
-  (typeof import.meta !== 'undefined' && import.meta.env?.VITE_ASSET_CONTRACT_ID) ||
-  'CA2B4QI5LZW63D2WFQIDADASCKPAWU3W75H7RZZQIXT244PK7636WQAA';
+// Live Stellar Testnet SEP-0041 Standard Asset Token Contract ID (Axon Enterprise License)
+export const DEFAULT_TESTNET_ASSET_CONTRACT = 'CA2B4QI5LZW63D2WFQIDADASCKPAWU3W75H7RZZQIXT244PK7636WQAA';
 
 /**
  * Format any Stellar public key or contract address into a clean shortened string

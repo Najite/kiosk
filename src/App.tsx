@@ -95,47 +95,45 @@ export function AppContent() {
         });
       }
 
-      // 2. Fetch real on-chain items
+      // 2. Fetch real on-chain items directly from Soroban persistent storage
       const onChainItems = await fetchAllContractItems();
-      if (onChainItems.length > 0) {
-        const formatted: ListingItem[] = onChainItems.map((item) => {
-          const typeLower = item.assetType.toLowerCase();
-          const category: AssetCategory =
-            typeLower.includes('pass')
-              ? 'pass'
-              : typeLower.includes('license')
-              ? 'license'
-              : typeLower.includes('credential') || typeLower.includes('badge')
-              ? 'badge'
-              : 'collectible';
+      const formatted: ListingItem[] = onChainItems.map((item) => {
+        const typeLower = item.assetType.toLowerCase();
+        const category: AssetCategory =
+          typeLower.includes('pass')
+            ? 'pass'
+            : typeLower.includes('license')
+            ? 'license'
+            : typeLower.includes('credential') || typeLower.includes('badge')
+            ? 'badge'
+            : 'collectible';
 
-          const urlMatch = item.description.match(/(https?:\/\/[^\s]+\.(?:png|jpg|jpeg|gif|webp|svg)|data:image\/[^\s]+)/i);
-          const itemImage = urlMatch
-            ? urlMatch[1]
-            : category === 'license'
-            ? '/images/axon_vault.jpg'
-            : '/images/axon_emblem.jpg';
+        const urlMatch = item.description.match(/(https?:\/\/[^\s]+\.(?:png|jpg|jpeg|gif|webp|svg)|data:image\/[^\s]+)/i);
+        const itemImage = urlMatch
+          ? urlMatch[1]
+          : category === 'license'
+          ? '/images/axon_vault.jpg'
+          : '/images/axon_emblem.jpg';
 
-          return {
-            id: item.id,
-            seller: item.seller,
-            title: item.title,
-            description: item.description,
-            assetType: category,
-            assetContract: item.assetContract,
-            assetAmount: Number(item.assetAmount),
-            paymentToken: item.paymentToken,
-            price: stroopsToXlm(item.price),
-            isListed: item.isListed,
-            status: item.status,
-            royaltyBps: onChainPolicy ? onChainPolicy.royaltyBps : 500,
-            badge: item.assetType,
-            image: itemImage,
-            createdAt: new Date().toISOString(),
-          };
-        });
-        setItems(formatted);
-      }
+        return {
+          id: item.id,
+          seller: item.seller,
+          title: item.title,
+          description: item.description,
+          assetType: category,
+          assetContract: item.assetContract,
+          assetAmount: Number(item.assetAmount),
+          paymentToken: item.paymentToken,
+          price: stroopsToXlm(item.price),
+          isListed: item.isListed,
+          status: item.status,
+          royaltyBps: onChainPolicy ? onChainPolicy.royaltyBps : 500,
+          badge: item.assetType,
+          image: itemImage,
+          createdAt: new Date().toISOString(),
+        };
+      });
+      setItems(formatted);
     } catch (err) {
       console.warn('Error loading on-chain data:', err);
     } finally {
