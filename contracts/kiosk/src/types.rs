@@ -5,8 +5,18 @@ use soroban_sdk::{contracttype, Address, String, Vec};
 pub enum DataKey {
     Owner,
     Item(u32),
-    Policy,
+    DefaultPolicy,
+    AssetPolicy(Address),
     ItemCount,
+}
+
+#[contracttype]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[repr(u32)]
+pub enum ItemStatus {
+    Placed = 1,
+    Listed = 2,
+    Sold = 3,
 }
 
 #[contracttype]
@@ -16,9 +26,13 @@ pub struct ListingItem {
     pub title: String,
     pub description: String,
     pub asset_type: String,
+    pub asset_contract: Address,
+    pub asset_amount: i128,
+    pub payment_token: Address,
     pub price: i128,
     pub is_listed: bool,
     pub seller: Address,
+    pub status: ItemStatus,
 }
 
 #[contracttype]
