@@ -469,7 +469,7 @@ export const KioskManagerView: React.FC<KioskManagerViewProps> = ({
               </div>
               <div>
                 <h4 className="text-sm font-bold text-white flex items-center gap-2">
-                  <span>Sui-Style Kiosk Standard on Stellar</span>
+                  <span>Autonomous Kiosk Protocol on Stellar</span>
                   <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-mono">
                     Asset-Agnostic
                   </span>
