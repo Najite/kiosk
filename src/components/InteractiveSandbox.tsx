@@ -1,10 +1,25 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Sliders, ArrowRight, ShieldCheck, DollarSign, PieChart, Check } from 'lucide-react';
+import { TransferPolicy } from '../types';
 
-export const InteractiveSandbox: React.FC = () => {
-  const [price, setPrice] = useState<number>(250);
-  const [royaltyBps, setRoyaltyBps] = useState<number>(750); // 7.5%
-  const [upstreamBps, setUpstreamBps] = useState<number>(250); // 2.5%
+interface InteractiveSandboxProps {
+  policy?: TransferPolicy;
+}
+
+export const InteractiveSandbox: React.FC<InteractiveSandboxProps> = ({ policy }) => {
+  const [price, setPrice] = useState<number>(100);
+  const [royaltyBps, setRoyaltyBps] = useState<number>(policy?.royaltyBps ?? 500);
+  const [upstreamBps, setUpstreamBps] = useState<number>(
+    policy?.upstreamSplits?.reduce((acc, s) => acc + s.bps, 0) ?? 0
+  );
+
+  useEffect(() => {
+    if (policy) {
+      if (policy.royaltyBps !== undefined) setRoyaltyBps(policy.royaltyBps);
+      const totalUpstream = policy.upstreamSplits?.reduce((acc, s) => acc + s.bps, 0) ?? 0;
+      setUpstreamBps(totalUpstream);
+    }
+  }, [policy]);
 
   const royaltyPct = royaltyBps / 100;
   const upstreamPct = upstreamBps / 100;

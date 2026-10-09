@@ -1,11 +1,15 @@
 import React, { useState } from 'react';
 import { Code2, Copy, Check, Sparkles, ExternalLink, ShieldCheck } from 'lucide-react';
 
+import { DEFAULT_TESTNET_SHOWCASE_KIOSK } from '../../lib/stellar';
+
 export const WidgetEmbedView: React.FC = () => {
   const [theme, setTheme] = useState<'obsidian' | 'violet' | 'glass'>('obsidian');
   const [buttonText, setButtonText] = useState('Buy with StellarKiosk');
   const [accentColor, setAccentColor] = useState('#8B5CF6');
   const [showCopied, setShowCopied] = useState<string | null>(null);
+
+  const siteOrigin = typeof window !== 'undefined' ? window.location.origin : 'https://kiosk.stellar.org';
 
   const copyToClipboard = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
@@ -18,7 +22,7 @@ export const WidgetEmbedView: React.FC = () => {
 export function CheckoutPage() {
   return (
     <StellarKioskButton
-      contractId="CDRKM3ZZXKJQ7VHCQUBO3BZWS3NDPWHSVSNDXX54ZFWEW3AMSI224T4R"
+      contractId="${DEFAULT_TESTNET_SHOWCASE_KIOSK}"
       itemId={1}
       network="testnet"
       theme="${theme}"
@@ -30,11 +34,11 @@ export function CheckoutPage() {
 }`;
 
   const webComponentSnippet = `<!-- Add script once in your <head> -->
-<script src="https://cdn.stellarkiosk.io/widget/v1.js" async></script>
+<script src="${siteOrigin}/widget/v1.js" async></script>
 
 <!-- Drop-in Kiosk Checkout Button -->
 <stellar-kiosk-button
-  contract="CDRKM3ZZXKJQ7VHCQUBO3BZWS3NDPWHSVSNDXX54ZFWEW3AMSI224T4R"
+  contract="${DEFAULT_TESTNET_SHOWCASE_KIOSK}"
   item-id="1"
   network="testnet"
   theme="${theme}"
@@ -43,7 +47,7 @@ export function CheckoutPage() {
 </stellar-kiosk-button>`;
 
   const iframeSnippet = `<iframe
-  src="https://checkout.stellarkiosk.io/embed/1?theme=${theme}&accent=${encodeURIComponent(accentColor)}"
+  src="${siteOrigin}/embed/1?theme=${theme}&accent=${encodeURIComponent(accentColor)}"
   width="100%"
   height="72px"
   frameborder="0"

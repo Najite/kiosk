@@ -42,6 +42,7 @@ export const KioskManagerView: React.FC<KioskManagerViewProps> = ({
   // Form states
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [imageUrl, setImageUrl] = useState('');
   const [assetType, setAssetType] = useState<AssetCategory>('pass');
   const [price, setPrice] = useState('15');
   const [mintMode, setMintMode] = useState<'place_and_list' | 'place_only'>('place_and_list');
@@ -72,12 +73,14 @@ export const KioskManagerView: React.FC<KioskManagerViewProps> = ({
           ? 'Credential'
           : 'Collectible';
 
+      const fullDescription = imageUrl.trim() ? `${description.trim()} ${imageUrl.trim()}` : description.trim();
+
       let res;
       if (mintMode === 'place_and_list') {
         res = await executePlaceAndList({
           sellerAddress: address,
           title,
-          description,
+          description: fullDescription,
           assetType: typeStr,
           priceInXlm: parseFloat(price) || 10,
         });
@@ -85,7 +88,7 @@ export const KioskManagerView: React.FC<KioskManagerViewProps> = ({
         res = await executePlace({
           sellerAddress: address,
           title,
-          description,
+          description: fullDescription,
           assetType: typeStr,
         });
       }
@@ -96,6 +99,7 @@ export const KioskManagerView: React.FC<KioskManagerViewProps> = ({
 
       setTitle('');
       setDescription('');
+      setImageUrl('');
       setPrice('15');
       setShowMintModal(false);
     } catch (err: any) {
@@ -470,6 +474,19 @@ export const KioskManagerView: React.FC<KioskManagerViewProps> = ({
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
                     className="w-full px-4 py-2.5 rounded-xl bg-[#0c0c14] border border-white/10 text-white text-xs focus:outline-none focus:border-purple-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-zinc-400 mb-1.5">
+                    Image / Media URI <span className="text-zinc-500 font-normal">(Optional HTTPS or IPFS URL)</span>
+                  </label>
+                  <input
+                    type="url"
+                    placeholder="https://images.unsplash.com/... or ipfs://..."
+                    value={imageUrl}
+                    onChange={(e) => setImageUrl(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl bg-[#0c0c14] border border-white/10 text-white text-xs focus:outline-none focus:border-purple-500 font-mono placeholder:text-zinc-600"
                   />
                 </div>
 

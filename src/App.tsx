@@ -11,24 +11,18 @@ import { WidgetEmbedView } from './components/views/WidgetEmbedView';
 import { ConnectModal } from './components/ConnectModal';
 import { CheckoutModal } from './components/CheckoutModal';
 import { Footer } from './components/Footer';
-import { fetchAllContractItems, fetchContractPolicy } from './lib/soroban';
+import { fetchAllContractItems, fetchContractPolicy, fetchContractOwner } from './lib/soroban';
 import { stroopsToXlm } from './lib/stellar';
 import { ListingItem, TransferPolicy, AssetCategory } from './types';
 import { CheckCircle2, RefreshCw } from 'lucide-react';
 import { getTabFromUrl, navigateToTab, TabId, TABS } from './lib/navigation';
 
-const FALLBACK_POLICY: TransferPolicy = {
-  owner: 'GD54GYI3SRVER7O56DLEXZEXQ2UJVXIOOXZYVV5ITCZ4MOEJ3XFLXNVO',
-  royaltyBps: 750,
-  royaltyRecipient: 'GBOLOWBCVE2AZ3XTFKQURYTSLZHTXA2IM7JSKIYOJB37XVTDPJTAEB5X',
-  minFloorPrice: 1,
-  upstreamSplits: [
-    {
-      recipient: 'GD54GYI3SRVER7O56DLEXZEXQ2UJVXIOOXZYVV5ITCZ4MOEJ3XFLXNVO',
-      bps: 250,
-      label: 'Protocol Treasury',
-    },
-  ],
+const INITIAL_POLICY: TransferPolicy = {
+  owner: '',
+  royaltyBps: 0,
+  royaltyRecipient: '',
+  minFloorPrice: 0,
+  upstreamSplits: [],
 };
 
 export function AppContent() {
@@ -65,7 +59,7 @@ export function AppContent() {
   }, [activeTab]);
 
   const [items, setItems] = useState<ListingItem[]>([]);
-  const [policy, setPolicy] = useState<TransferPolicy>(FALLBACK_POLICY);
+  const [policy, setPolicy] = useState<TransferPolicy>(INITIAL_POLICY);
   const [isLoadingOnChain, setIsLoadingOnChain] = useState<boolean>(true);
 
   // Modals state
@@ -81,11 +75,15 @@ export function AppContent() {
   const loadOnChainData = useCallback(async () => {
     setIsLoadingOnChain(true);
     try {
-      // 1. Fetch real on-chain policy
-      const onChainPolicy = await fetchContractPolicy();
+      // 1. Fetch real on-chain policy and contract owner concurrently
+      const [onChainPolicy, onChainOwner] = await Promise.all([
+        fetchContractPolicy(),
+        fetchContractOwner(),
+      ]);
+
       if (onChainPolicy) {
         setPolicy({
-          owner: 'GD54GYI3SRVER7O56DLEXZEXQ2UJVXIOOXZYVV5ITCZ4MOEJ3XFLXNVO',
+          owner: onChainOwner || onChainPolicy.royaltyRecipient,
           royaltyBps: onChainPolicy.royaltyBps,
           royaltyRecipient: onChainPolicy.royaltyRecipient,
           minFloorPrice: stroopsToXlm(onChainPolicy.minFloorPrice),
@@ -111,6 +109,13 @@ export function AppContent() {
               ? 'badge'
               : 'collectible';
 
+          const urlMatch = item.description.match(/(https?:\/\/[^\s]+\.(?:png|jpg|jpeg|gif|webp|svg)|data:image\/[^\s]+)/i);
+          const itemImage = urlMatch
+            ? urlMatch[1]
+            : category === 'license'
+            ? '/images/axon_vault.jpg'
+            : '/images/axon_emblem.jpg';
+
           return {
             id: item.id,
             seller: item.seller,
@@ -123,9 +128,9 @@ export function AppContent() {
             price: stroopsToXlm(item.price),
             isListed: item.isListed,
             status: item.status,
-            royaltyBps: onChainPolicy ? onChainPolicy.royaltyBps : 750,
+            royaltyBps: onChainPolicy ? onChainPolicy.royaltyBps : 500,
             badge: item.assetType,
-            image: category === 'license' ? '/images/axon_vault.jpg' : '/images/axon_emblem.jpg',
+            image: itemImage,
             createdAt: new Date().toISOString(),
           };
         });
@@ -174,7 +179,7 @@ export function AppContent() {
               onOpenConnectModal={() => setIsConnectModalOpen(true)}
             />
             <TelemetryBar />
-            <InteractiveSandbox />
+            <InteractiveSandbox policy={policy} />
 
             {/* Live On-Chain Item Preview */}
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-20">

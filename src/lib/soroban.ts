@@ -103,6 +103,40 @@ export async function fetchContractPolicy(
 }
 
 /**
+ * Read protocol admin / contract owner address directly from Soroban persistent storage
+ */
+export async function fetchContractOwner(
+  contractId: string = TESTNET_CONTRACT_ID,
+  network: StellarNetwork = 'TESTNET',
+  callerAddress?: string
+): Promise<string | null> {
+  try {
+    const server = getSorobanRpc(network);
+    const contract = new Contract(contractId);
+    const simAccount = getSimulationCaller(callerAddress);
+
+    const tx = new TransactionBuilder(simAccount, {
+      fee: '100',
+      networkPassphrase: STELLAR_CONFIG[network].passphrase,
+    })
+      .addOperation(contract.call('get_owner'))
+      .setTimeout(30)
+      .build();
+
+    const sim = await server.simulateTransaction(tx);
+    if (!rpc.Api.isSimulationSuccess(sim) || !sim.result?.retval) {
+      return null;
+    }
+
+    const val = scValToNative(sim.result.retval);
+    return typeof val === 'string' ? val : null;
+  } catch (err) {
+    console.warn('Failed to fetch on-chain owner:', err);
+    return null;
+  }
+}
+
+/**
  * Read total items registered in the Kiosk contract
  */
 export async function fetchContractItemCount(

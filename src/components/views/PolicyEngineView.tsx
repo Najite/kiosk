@@ -34,7 +34,7 @@ export const PolicyEngineView: React.FC<PolicyEngineViewProps> = ({
     setUpstreamSplits([
       ...upstreamSplits,
       {
-        recipient: 'GD54GYI3SRVER7O56DLEXZEXQ2UJVXIOOXZYVV5ITCZ4MOEJ3XFLXNVO',
+        recipient: '',
         bps: 100,
         label: `Partner #${upstreamSplits.length + 1}`,
       },
