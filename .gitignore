@@ -27,4 +27,6 @@ dist-ssr
 target
 contracts/**/target
 contracts/**/test_snapshots
+.agents
+.github
 
