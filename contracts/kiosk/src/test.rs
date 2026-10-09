@@ -653,4 +653,8 @@ fn test_kiosk_custom_asset_purchase_delivery() {
     // Verify payment routing (500 price: 10% royalty = 50, 450 net seller)
     assert_eq!(payment_client.balance(&royalty_recipient), 50);
     assert_eq!(payment_client.balance(&seller), 450);
+
+    // 5. Attempting to withdraw an already sold item must fail
+    let withdraw_res = kiosk_client.try_withdraw(&buyer, &item_id);
+    assert_eq!(withdraw_res, Err(Ok(KioskError::ItemAlreadySold)));
 }

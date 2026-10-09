@@ -28,6 +28,7 @@ pub enum KioskError {
     InvalidAmount = 9,
     ItemAlreadyListed = 10,
     CannotWithdrawListed = 11,
+    ItemAlreadySold = 12,
 }
 
 fn validate_policy_bps(
@@ -436,6 +437,9 @@ impl KioskContract {
 
         if item.status == ItemStatus::Listed {
             return Err(KioskError::CannotWithdrawListed);
+        }
+        if item.status == ItemStatus::Sold {
+            return Err(KioskError::ItemAlreadySold);
         }
 
         // Transfer the escrowed asset from the Kiosk contract back to the seller

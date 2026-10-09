@@ -560,10 +560,12 @@ export const KioskManagerView: React.FC<KioskManagerViewProps> = ({
                     className={`text-[10px] font-mono px-2.5 py-0.5 rounded-full ${
                       item.isListed
                         ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                        : item.status === 'sold'
+                        ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
                         : 'bg-zinc-800 text-zinc-400 border border-white/10'
                     }`}
                   >
-                    {item.isListed ? 'LISTED ON SOROBAN' : 'DELISTED / VAULT'}
+                    {item.isListed ? 'LISTED ON SOROBAN' : item.status === 'sold' ? 'SOLD & DELIVERED' : 'IN VAULT CUSTODY'}
                   </span>
                 </div>
 
@@ -592,7 +594,7 @@ export const KioskManagerView: React.FC<KioskManagerViewProps> = ({
                   </div>
 
                   <div className="flex items-center justify-between text-zinc-400">
-                    <span className="text-zinc-500">Seller Wallet:</span>
+                    <span className="text-zinc-500">Current Owner:</span>
                     <span>{formatAddress(item.seller, 5, 5)}</span>
                   </div>
                 </div>
@@ -603,12 +605,16 @@ export const KioskManagerView: React.FC<KioskManagerViewProps> = ({
                       {item.isListed ? 'PRICE' : 'STATUS'}
                     </div>
                     <div className="text-base font-bold font-mono text-white">
-                      {item.isListed ? `${item.price} XLM` : 'In Vault'}
+                      {item.isListed ? `${item.price} XLM` : item.status === 'sold' ? 'Delivered' : 'In Vault'}
                     </div>
                   </div>
 
                   <div className="flex items-center gap-2">
-                    {item.isListed ? (
+                    {item.status === 'sold' ? (
+                      <span className="px-3 py-1 rounded-full text-[11px] font-mono bg-blue-500/10 text-blue-300 border border-blue-500/20">
+                        Settled to Buyer
+                      </span>
+                    ) : item.isListed ? (
                       <button
                         onClick={() => handleDelist(item.id)}
                         className="px-3.5 py-1.5 rounded-full text-xs font-semibold bg-rose-500/20 text-rose-300 border border-rose-500/30 hover:bg-rose-500/30 transition-all"
