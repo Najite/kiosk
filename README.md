@@ -144,25 +144,19 @@ The StellarKiosk protocol is organized across three integrated tiers: Client Pre
 
 When a buyer triggers `purchase(buyer, item_id)`, the transaction is executed as an **indivisible multi-party payment settlement**:
 
-#### Formal Mathematical Specification
-All fee percentages are parameterized in basis points ($\text{BPS}$), where $1\text{ BPS} = 0.01\%$ and $10,000\text{ BPS} = 100.00\%$:
+#### Settlement Fee Distribution Breakdown
 
-$$\text{Royalty Amount} = \left\lfloor \frac{\text{Price} \times \text{Policy.RoyaltyBps}}{10,000} \right\rfloor$$
+Fee allocations are configured using **basis points (BPS)**, where `100 BPS = 1.00%` and `10,000 BPS = 100.00%`. During `purchase()`, the contract automatically calculates and routes each payment leg directly from the buyer's account:
 
-$$\text{Upstream Split}_i = \left\lfloor \frac{\text{Price} \times \text{Split}_i.\text{ShareBps}}{10,000} \right\rfloor \quad \forall \; i \in \{1, \dots, n\}$$
+| Payment Leg | Configuration Source | Calculation Rule | Designated Recipient | Example (100 XLM Sale) |
+| :--- | :--- | :--- | :--- | :--- |
+| **Creator Royalty** | `policy.royalty_bps` (e.g. 500 = 5%) | `(price * royalty_bps) / 10,000` | Collection Creator / Designated Address | **5.00 XLM** |
+| **Upstream Split #1** | `split[0].share_bps` (e.g. 250 = 2.5%) | `(price * share_bps) / 10,000` | Protocol Treasury / DAO Account | **2.50 XLM** |
+| **Upstream Split #2** | `split[1].share_bps` (e.g. 100 = 1%) | `(price * share_bps) / 10,000` | Referral Partner / Platform Affiliate | **1.00 XLM** |
+| **Seller Net Payout** | Remaining Balance | `price - royalty - total_splits` | Listing Seller | **91.50 XLM** |
 
-$$\text{Total Upstream} = \sum_{i=1}^{n} \text{Upstream Split}_i$$
-
-$$\text{Seller Net Payout} = \text{Price} - \text{Royalty Amount} - \text{Total Upstream}$$
-
-#### Split Validation & Conservation Invariant
-The protocol strictly enforces at configuration time that total deductions cannot exceed the gross sale price:
-
-$$\text{Policy.RoyaltyBps} + \sum_{i=1}^{n} \text{Split}_i.\text{ShareBps} \le 10,000 \quad (100.00\%)$$
-
-$$\text{Price} = \text{Royalty Amount} + \text{Total Upstream} + \text{Seller Net Payout}$$
-
-Integer division truncation guarantees that the sum of distributed payments is always strictly less than or equal to `item.price`, preventing inflationary rounding overflows.
+* **Basis Point Safety Cap:** Total deductions (`royalty_bps + sum(share_bps)`) cannot exceed `10,000 BPS` (100%). Any policy exceeding this is rejected with `KioskError::InvalidBps (7)`.
+* **Zero-Leakage Guarantee:** The contract uses native integer division truncation. The net seller payout is calculated by subtracting total distributed fees from the gross price, ensuring 100% of the buyer's payment is distributed with zero stranded tokens.
 
 #### Step-by-Step Execution Sequence
 
@@ -177,9 +171,9 @@ Integer division truncation guarantees that the sum of distributed payments is a
    * Asserts `item.price >= policy.min_floor_price`.
 4. **Multi-Party Payment Leg:**
    * Initializes `token::Client::new(&env, &item.payment_token)`.
-   * **Upstream Splits:** Iterates through `policy.upstream_splits`. For each split where $\text{amount} > 0$, executes `payment_client.transfer(&buyer, &split.recipient, &amount)`.
-   * **Creator Royalty:** If $\text{Royalty Amount} > 0$, executes `payment_client.transfer(&buyer, &policy.royalty_recipient, &royalty_amount)`.
-   * **Seller Payout:** If $\text{Seller Net Payout} > 0$, executes `payment_client.transfer(&buyer, &item.seller, &seller_amount)`.
+   * **Upstream Splits:** Iterates through `policy.upstream_splits`. For each split where `amount > 0`, executes `payment_client.transfer(&buyer, &split.recipient, &amount)`.
+   * **Creator Royalty:** If `royalty_amount > 0`, executes `payment_client.transfer(&buyer, &policy.royalty_recipient, &royalty_amount)`.
+   * **Seller Payout:** If `seller_amount > 0`, executes `payment_client.transfer(&buyer, &item.seller, &seller_amount)`.
 5. **Asset Custody Delivery Leg:**
    * Initializes `token::Client::new(&env, &item.asset_contract)`.
    * Transfers escrowed tokens directly from the Kiosk contract address to the buyer:  
@@ -268,8 +262,9 @@ The protocol utilizes Soroban's multi-tiered storage model to balance ledger foo
 ### 4.1 Entry Point Interface Signatures
 
 ```rust
-pub trait KioskContractTrait {
-    fn initialize(
+#[contractimpl]
+impl KioskContract {
+    pub fn initialize(
         env: Env,
         owner: Address,
         royalty_bps: u32,
@@ -278,7 +273,7 @@ pub trait KioskContractTrait {
         upstream_splits: Vec<UpstreamSplit>,
     ) -> Result<(), KioskError>;
 
-    fn set_policy(
+    pub fn set_policy(
         env: Env,
         caller: Address,
         royalty_bps: u32,
@@ -287,7 +282,7 @@ pub trait KioskContractTrait {
         upstream_splits: Vec<UpstreamSplit>,
     ) -> Result<(), KioskError>;
 
-    fn set_asset_policy(
+    pub fn set_asset_policy(
         env: Env,
         creator: Address,
         asset_contract: Address,
@@ -297,7 +292,7 @@ pub trait KioskContractTrait {
         upstream_splits: Vec<UpstreamSplit>,
     ) -> Result<(), KioskError>;
 
-    fn place(
+    pub fn place(
         env: Env,
         seller: Address,
         asset_contract: Address,
@@ -307,7 +302,7 @@ pub trait KioskContractTrait {
         asset_type: String,
     ) -> Result<u32, KioskError>;
 
-    fn list(
+    pub fn list(
         env: Env,
         seller: Address,
         item_id: u32,
@@ -315,7 +310,7 @@ pub trait KioskContractTrait {
         payment_token: Address,
     ) -> Result<(), KioskError>;
 
-    fn place_and_list(
+    pub fn place_and_list(
         env: Env,
         seller: Address,
         asset_contract: Address,
@@ -327,25 +322,25 @@ pub trait KioskContractTrait {
         asset_type: String,
     ) -> Result<u32, KioskError>;
 
-    fn delist(env: Env, caller: Address, item_id: u32) -> Result<(), KioskError>;
+    pub fn delist(env: Env, caller: Address, item_id: u32) -> Result<(), KioskError>;
 
-    fn update_price(env: Env, caller: Address, item_id: u32, new_price: i128) -> Result<(), KioskError>;
+    pub fn update_price(env: Env, caller: Address, item_id: u32, new_price: i128) -> Result<(), KioskError>;
 
-    fn withdraw(env: Env, caller: Address, item_id: u32) -> Result<(), KioskError>;
+    pub fn withdraw(env: Env, caller: Address, item_id: u32) -> Result<(), KioskError>;
 
-    fn purchase(env: Env, buyer: Address, item_id: u32) -> Result<(), KioskError>;
+    pub fn purchase(env: Env, buyer: Address, item_id: u32) -> Result<(), KioskError>;
 
-    fn get_default_policy(env: Env) -> Result<TransferPolicy, KioskError>;
+    pub fn get_default_policy(env: Env) -> Result<TransferPolicy, KioskError>;
 
-    fn get_asset_policy(env: Env, asset_contract: Address) -> Result<TransferPolicy, KioskError>;
+    pub fn get_asset_policy(env: Env, asset_contract: Address) -> Result<TransferPolicy, KioskError>;
 
-    fn get_policy(env: Env, asset_contract: Option<Address>) -> Result<TransferPolicy, KioskError>;
+    pub fn get_policy(env: Env, asset_contract: Option<Address>) -> Result<TransferPolicy, KioskError>;
 
-    fn get_item(env: Env, item_id: u32) -> Result<ListingItem, KioskError>;
+    pub fn get_item(env: Env, item_id: u32) -> Result<ListingItem, KioskError>;
 
-    fn get_item_count(env: Env) -> u32;
+    pub fn get_item_count(env: Env) -> u32;
 
-    fn get_owner(env: Env) -> Result<Address, KioskError>;
+    pub fn get_owner(env: Env) -> Result<Address, KioskError>;
 }
 ```
 
@@ -356,17 +351,17 @@ pub trait KioskContractTrait {
 #### `initialize`
 * **Signature:** `initialize(env: Env, owner: Address, royalty_bps: u32, royalty_recipient: Address, min_floor_price: i128, upstream_splits: Vec<UpstreamSplit>) -> Result<(), KioskError>`
 * **Authorization:** `owner.require_auth()`
-* **Behavior:** One-time configuration of the protocol owner, default royalty policy, and upstream revenue splits. Reverts with `AlreadyInitialized (1)` if `DataKey::Owner` exists. Validates that $\text{royalty\_bps} + \sum \text{share\_bps} \le 10,000$.
+* **Behavior:** One-time configuration of the protocol owner, default royalty policy, and upstream revenue splits. Reverts with `AlreadyInitialized (1)` if `DataKey::Owner` exists. Validates that `royalty_bps + sum(share_bps) <= 10,000`.
 
 #### `set_policy`
 * **Signature:** `set_policy(env: Env, caller: Address, royalty_bps: u32, royalty_recipient: Address, min_floor_price: i128, upstream_splits: Vec<UpstreamSplit>) -> Result<(), KioskError>`
 * **Authorization:** `caller.require_auth()`
-* **Behavior:** Updates protocol-wide fallback transfer policy. Validates `caller == owner`; reverts with `Unauthorized (3)` otherwise. Validates basis points ($\le 10,000$).
+* **Behavior:** Updates protocol-wide fallback transfer policy. Validates `caller == owner`; reverts with `Unauthorized (3)` otherwise. Validates basis points (`<= 10,000`).
 
 #### `set_asset_policy`
 * **Signature:** `set_asset_policy(env: Env, creator: Address, asset_contract: Address, royalty_bps: u32, royalty_recipient: Address, min_floor_price: i128, upstream_splits: Vec<UpstreamSplit>) -> Result<(), KioskError>`
 * **Authorization:** `creator.require_auth()`
-* **Behavior:** Sets a collection-specific transfer policy stored under `DataKey::AssetPolicy(asset_contract)`. Overrides default policy for items using this asset contract. Validates basis points ($\le 10,000$).
+* **Behavior:** Sets a collection-specific transfer policy stored under `DataKey::AssetPolicy(asset_contract)`. Overrides default policy for items using this asset contract. Validates basis points (`<= 10,000`).
 
 #### `place`
 * **Signature:** `place(env: Env, seller: Address, asset_contract: Address, asset_amount: i128, title: String, description: String, asset_type: String) -> Result<u32, KioskError>`
@@ -524,7 +519,7 @@ The protocol emits standard Soroban contract events using the contract-level ide
 ### 5.1 Stellar Asset Contract (SAC)
 The Stellar Asset Contract (SAC) brings classic Stellar assets into the Soroban smart contract environment:
 * **Native XLM:** Represented on Testnet by contract address `CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC`.
-* **Precision & Stroop Accounting:** $1\text{ XLM} = 10,000,000\text{ stroops}$ ($10^{-7}\text{ XLM}$). The contract processes all price calculations, royalty allocations, and upstream splits in native 64/128-bit integer stroop values.
+* **Precision & Stroop Accounting:** 1 XLM = 10,000,000 stroops (0.0000001 XLM per stroop). The contract processes all price calculations, royalty allocations, and upstream splits in native 64/128-bit integer stroop values.
 * **Unified Interface:** Classic Stellar assets and custom smart contracts use the exact same `token::Client` invocation methods (`transfer`, `balance`, `approve`).
 
 ### 5.2 SEP-0041 Fungible & Semi-Fungible Tokens
@@ -628,8 +623,7 @@ kiosk/
 │   └── kiosk_asset/                       # SEP-0041 Standard Digital Asset Contract
 │       ├── Cargo.toml                     # Token contract dependencies
 │       └── src/
-│           ├── lib.rs                     # Token logic (mint, transfer, approve, allowance)
-│           ├── types.rs                   # Token DataKey & Allowance structures
+│           ├── lib.rs                     # SEP-0041 implementation & token types (mint, transfer, allowance)
 │           └── test.rs                    # 4 token unit tests (allowance, mint, balances)
 ├── src/
 │   ├── App.tsx                            # Root application component & routing
@@ -713,7 +707,7 @@ test result: ok. 21 passed; 0 failed; 0 ignored; finished in 2.79s
 ### 8.1 Kiosk Protocol Test Suite (17 Tests)
 1. `test_initialize_and_default_policy`: Verifies protocol initialization, default policy storage, and owner configuration.
 2. `test_already_initialized_fails`: Asserts calling `initialize()` a second time reverts with `AlreadyInitialized (1)`.
-3. `test_invalid_bps_fails`: Asserts that setting royalty + upstream split basis points $> 10,000$ reverts with `InvalidBps (7)`.
+3. `test_invalid_bps_fails`: Asserts that setting royalty + upstream split basis points exceeding 10,000 BPS (> 100%) reverts with `InvalidBps (7)`.
 4. `test_unauthorized_set_policy_fails`: Asserts non-owner callers cannot modify the default policy (`Unauthorized (3)`).
 5. `test_set_asset_policy_override`: Verifies collection creators can set custom royalty overrides that take precedence over the protocol default.
 6. `test_invalid_place_amount_fails`: Asserts depositing zero or negative tokens reverts with `InvalidAmount (9)`.
@@ -805,6 +799,7 @@ You can query, inspect, and invoke the live deployed Testnet contracts directly 
 ```bash
 stellar contract invoke \
   --id CDRKM3ZZXKJQ7VHCQUBO3BZWS3NDPWHSVSNDXX54ZFWEW3AMSI224T4R \
+  --source-account GBOLOWBCVE2AZ3XTFKQURYTSLZHTXA2IM7JSKIYOJB37XVTDPJTAEB5X \
   --network testnet \
   -- get_item_count
 ```
@@ -813,6 +808,7 @@ stellar contract invoke \
 ```bash
 stellar contract invoke \
   --id CDRKM3ZZXKJQ7VHCQUBO3BZWS3NDPWHSVSNDXX54ZFWEW3AMSI224T4R \
+  --source-account GBOLOWBCVE2AZ3XTFKQURYTSLZHTXA2IM7JSKIYOJB37XVTDPJTAEB5X \
   --network testnet \
   -- get_item \
   --item_id 8
@@ -822,6 +818,7 @@ stellar contract invoke \
 ```bash
 stellar contract invoke \
   --id CDRKM3ZZXKJQ7VHCQUBO3BZWS3NDPWHSVSNDXX54ZFWEW3AMSI224T4R \
+  --source-account GBOLOWBCVE2AZ3XTFKQURYTSLZHTXA2IM7JSKIYOJB37XVTDPJTAEB5X \
   --network testnet \
   -- get_default_policy
 ```
@@ -830,6 +827,7 @@ stellar contract invoke \
 ```bash
 stellar contract invoke \
   --id CA2B4QI5LZW63D2WFQIDADASCKPAWU3W75H7RZZQIXT244PK7636WQAA \
+  --source-account GBOLOWBCVE2AZ3XTFKQURYTSLZHTXA2IM7JSKIYOJB37XVTDPJTAEB5X \
   --network testnet \
   -- balance \
   --id GBOLOWBCVE2AZ3XTFKQURYTSLZHTXA2IM7JSKIYOJB37XVTDPJTAEB5X
@@ -903,15 +901,11 @@ stellar contract invoke \
 
 The protocol maintains four strict formal invariants guaranteed by the Soroban runtime:
 
-1. **Custodial Solvency Invariant:**  
-   The token balance held by the Kiosk contract address for any asset contract $A$ is strictly equal to the sum of escrowed tokens across all active `Placed` and `Listed` items:
-   $$\text{Balance}_{\text{Kiosk}}(A) = \sum_{k \in \mathcal{K}, \; k.\text{asset} = A, \; k.\text{status} \in \{\text{Placed}, \text{Listed}\}} k.\text{asset\_amount}$$
-   No assets can be stranded, locked indefinitely, or siphoned by non-sellers.
+1. **1:1 Custodial Solvency Guarantee:**  
+   The token balance held by the Kiosk contract address is backed 100% by physical token balances from currently active `Placed` and `Listed` items. The protocol does not support synthetic listings, IOUs, or unbacked inventory. Escrowed tokens can only leave the contract via an authorized seller withdrawal or an atomic purchase delivery.
 
-2. **Payment Value Conservation:**  
-   The gross price paid by the buyer is strictly conserved across all recipients without loss or leakage:
-   $$\text{Price} = \text{Royalty Amount} + \sum_{i=1}^{n} \text{Split}_i + \text{Seller Net Payout}$$
-   Because basis point division truncates downwards, $\text{Seller Net Payout}$ absorbs any remaining fractional stroops, ensuring exact zero-sum settlement.
+2. **Zero-Leakage Payment Settlement:**  
+   The gross purchase price paid by the buyer is completely distributed across creator royalties, upstream splits, and the net seller payout within the same atomic transaction envelope. The contract holds zero fee surplus and never siphons unallocated funds.
 
 3. **Re-Entrancy & Race Condition Immunity:**  
    Soroban transactions are processed sequentially within deterministic ledger boundaries. State mutations (`item.status = Sold`, `item.is_listed = false`) are updated atomically in the same invocation as the cross-contract payment transfers. Calling `withdraw()` on a listed item is blocked by status invariant checks (`CannotWithdrawListed = 11`), preventing double-spend race conditions.
