@@ -8,10 +8,12 @@ import {
   executeWithdraw,
   fetchTokenBalance,
   fetchTokenMetadata,
+  addTokenToFreighter,
   type TokenMetadata,
 } from '../../lib/soroban';
 import {
   TESTNET_CONTRACT_ID,
+  DEFAULT_TESTNET_ASSET_CONTRACT,
   NATIVE_SAC,
   formatAddress,
   fetchLiveAccount,
@@ -91,7 +93,23 @@ export const KioskManagerView: React.FC<KioskManagerViewProps> = ({
   const [listingItemId, setListingItemId] = useState<number | null>(null);
   const [listingPrice, setListingPrice] = useState('20');
 
-  // Load user's real wallet assets directly from Horizon and Soroban
+  // Filter and wallet action states
+  const [vaultFilter, setVaultFilter] = useState<'all' | 'my_holdings' | 'escrow'>('all');
+  const [addingFreighterContract, setAddingFreighterContract] = useState<string | null>(null);
+  const [freighterSuccessContract, setFreighterSuccessContract] = useState<string | null>(null);
+  const [copiedContractId, setCopiedContractId] = useState<string | null>(null);
+
+  const handleAddToFreighter = async (contractId: string) => {
+    setAddingFreighterContract(contractId);
+    const res = await addTokenToFreighter(contractId);
+    setAddingFreighterContract(null);
+    if (res.success) {
+      setFreighterSuccessContract(contractId);
+      setTimeout(() => setFreighterSuccessContract(null), 3000);
+    }
+  };
+
+  // Load user's real wallet assets directly from Horizon and Soroban RPC
   const loadWalletHoldings = useCallback(async () => {
     if (!address) {
       setWalletHoldings([]);
@@ -113,7 +131,39 @@ export const KioskManagerView: React.FC<KioskManagerViewProps> = ({
         isNative: true,
       });
 
-      // 2. Check any other issued classic assets on Horizon
+      // 2. Query known Soroban SEP-0041 tokens owned by this wallet
+      const candidateContracts = new Set<string>();
+      candidateContracts.add(DEFAULT_TESTNET_ASSET_CONTRACT);
+      items.forEach((item) => {
+        if (
+          item.assetContract &&
+          item.assetContract.startsWith('C') &&
+          item.assetContract !== NATIVE_SAC.TESTNET
+        ) {
+          candidateContracts.add(item.assetContract);
+        }
+      });
+
+      for (const contractId of Array.from(candidateContracts)) {
+        try {
+          const bal = await fetchTokenBalance(contractId, address);
+          if (bal !== null && bal > 0n) {
+            const meta = await fetchTokenMetadata(contractId);
+            holdings.push({
+              name: meta?.name || 'Soroban Asset',
+              symbol: meta?.symbol || 'TOKEN',
+              contractId,
+              balanceFormatted: bal.toString(),
+              balanceRaw: bal,
+              isNative: false,
+            });
+          }
+        } catch (e) {
+          console.warn(`Balance check for ${contractId} skipped:`, e);
+        }
+      }
+
+      // 3. Check any other issued classic assets on Horizon
       for (const bal of acc.balances) {
         if (bal.asset_type !== 'native' && bal.asset_code) {
           holdings.push({
@@ -133,7 +183,7 @@ export const KioskManagerView: React.FC<KioskManagerViewProps> = ({
     } finally {
       setIsLoadingHoldings(false);
     }
-  }, [address]);
+  }, [address, items]);
 
   useEffect(() => {
     if (showDepositModal) {
@@ -532,8 +582,60 @@ export const KioskManagerView: React.FC<KioskManagerViewProps> = ({
 
       {/* Vault Inventory Grid */}
       <div className="space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
-          <h3 className="text-lg font-bold text-white">Live On-Chain Holdings</h3>
+        {/* Freighter Tip Callout */}
+        <div className="p-4 rounded-2xl bg-gradient-to-r from-purple-950/40 to-violet-950/20 border border-purple-500/20 flex flex-col md:flex-row md:items-center justify-between gap-4 text-xs">
+          <div className="flex items-start gap-3">
+            <div className="w-8 h-8 rounded-lg bg-purple-500/20 text-purple-400 flex items-center justify-center shrink-0 mt-0.5">
+              <Wallet className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="font-bold text-white flex items-center gap-2">
+                <span>Freighter Wallet Asset Synchronization</span>
+                <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-mono">
+                  SEP-0041 Standard
+                </span>
+              </div>
+              <p className="text-zinc-400 text-xs mt-1 leading-relaxed">
+                When you purchase Kiosk assets, Soroban delivers the smart-contract tokens directly to your wallet address. In Freighter, custom Soroban tokens live in the <strong className="text-white">Tokens</strong> tab once tracked. They do <strong className="text-white">not</strong> appear in Freighter's <strong className="text-white">Collectibles</strong> tab (which is reserved for classic NFTs). Click <strong className="text-purple-300">+ Add to Freighter</strong> on any asset below to view it in your wallet!
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => setVaultFilter('all')}
+              className={`px-3.5 py-1.5 rounded-full text-xs font-medium transition-all ${
+                vaultFilter === 'all'
+                  ? 'bg-purple-600 text-white font-bold'
+                  : 'bg-white/5 text-zinc-400 hover:text-white border border-white/5'
+              }`}
+            >
+              All Protocol Items ({items.length})
+            </button>
+            <button
+              onClick={() => setVaultFilter('my_holdings')}
+              className={`px-3.5 py-1.5 rounded-full text-xs font-medium transition-all ${
+                vaultFilter === 'my_holdings'
+                  ? 'bg-purple-600 text-white font-bold'
+                  : 'bg-white/5 text-zinc-400 hover:text-white border border-white/5'
+              }`}
+            >
+              My Purchased Assets ({items.filter((i) => address && i.seller.toLowerCase() === address.toLowerCase()).length})
+            </button>
+            <button
+              onClick={() => setVaultFilter('escrow')}
+              className={`px-3.5 py-1.5 rounded-full text-xs font-medium transition-all ${
+                vaultFilter === 'escrow'
+                  ? 'bg-purple-600 text-white font-bold'
+                  : 'bg-white/5 text-zinc-400 hover:text-white border border-white/5'
+              }`}
+            >
+              Active In Vault ({items.filter((i) => i.status !== 'sold').length})
+            </button>
+          </div>
+
           <div className="flex items-center gap-2">
             <span className="text-xs text-zinc-500 font-mono">Contract:</span>
             <a
@@ -549,7 +651,19 @@ export const KioskManagerView: React.FC<KioskManagerViewProps> = ({
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {items.map((item) => (
+          {items
+            .filter((item) => {
+              if (vaultFilter === 'my_holdings') {
+                return address && item.seller.toLowerCase() === address.toLowerCase();
+              }
+              if (vaultFilter === 'escrow') {
+                return item.status !== 'sold';
+              }
+              return true;
+            })
+            .map((item) => {
+              const isOwner = Boolean(address && item.seller.toLowerCase() === address.toLowerCase());
+              return (
             <div key={item.id} className="double-bezel-outer">
               <div className="double-bezel-inner p-5 flex flex-col h-full">
                 <div className="flex items-center justify-between mb-3">
@@ -595,7 +709,9 @@ export const KioskManagerView: React.FC<KioskManagerViewProps> = ({
 
                   <div className="flex items-center justify-between text-zinc-400">
                     <span className="text-zinc-500">Current Owner:</span>
-                    <span>{formatAddress(item.seller, 5, 5)}</span>
+                    <span className={isOwner ? 'text-emerald-400 font-bold' : ''}>
+                      {formatAddress(item.seller, 5, 5)} {isOwner ? '(You)' : ''}
+                    </span>
                   </div>
                 </div>
 
@@ -611,9 +727,49 @@ export const KioskManagerView: React.FC<KioskManagerViewProps> = ({
 
                   <div className="flex items-center gap-2">
                     {item.status === 'sold' ? (
-                      <span className="px-3 py-1 rounded-full text-[11px] font-mono bg-blue-500/10 text-blue-300 border border-blue-500/20">
-                        Settled to Buyer
-                      </span>
+                      item.assetContract && item.assetContract !== NATIVE_SAC.TESTNET ? (
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            onClick={() => handleAddToFreighter(item.assetContract!)}
+                            disabled={addingFreighterContract === item.assetContract}
+                            className="px-2.5 py-1 rounded-full text-[10px] font-mono bg-purple-600/30 text-purple-300 border border-purple-500/40 hover:bg-purple-600/50 transition-all flex items-center gap-1"
+                            title="Add SEP-0041 token to Freighter Wallet"
+                          >
+                            {freighterSuccessContract === item.assetContract ? (
+                              <>
+                                <Check className="w-3 h-3 text-emerald-400" />
+                                <span>Added!</span>
+                              </>
+                            ) : addingFreighterContract === item.assetContract ? (
+                              <span>Prompting...</span>
+                            ) : (
+                              <>
+                                <Plus className="w-3 h-3" />
+                                <span>Add to Freighter</span>
+                              </>
+                            )}
+                          </button>
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(item.assetContract!);
+                              setCopiedContractId(item.assetContract!);
+                              setTimeout(() => setCopiedContractId(null), 2000);
+                            }}
+                            className="p-1 rounded-lg bg-black/40 border border-white/10 hover:border-white/20 text-zinc-400 hover:text-white"
+                            title="Copy Contract ID"
+                          >
+                            {copiedContractId === item.assetContract ? (
+                              <Check className="w-3 h-3 text-emerald-400" />
+                            ) : (
+                              <Copy className="w-3 h-3" />
+                            )}
+                          </button>
+                        </div>
+                      ) : (
+                        <span className="px-3 py-1 rounded-full text-[11px] font-mono bg-blue-500/10 text-blue-300 border border-blue-500/20">
+                          Settled as XLM SAC
+                        </span>
+                      )
                     ) : item.isListed ? (
                       <button
                         onClick={() => handleDelist(item.id)}
@@ -644,7 +800,8 @@ export const KioskManagerView: React.FC<KioskManagerViewProps> = ({
                 </div>
               </div>
             </div>
-          ))}
+          );
+        })}
         </div>
       </div>
 

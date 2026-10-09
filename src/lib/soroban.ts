@@ -9,7 +9,7 @@ import {
   Keypair,
   xdr,
 } from '@stellar/stellar-sdk';
-import { signTransaction, isConnected as isFreighterConnected } from '@stellar/freighter-api';
+import { signTransaction, isConnected as isFreighterConnected, addToken } from '@stellar/freighter-api';
 import {
   STELLAR_CONFIG,
   TESTNET_CONTRACT_ID,
@@ -712,5 +712,27 @@ export async function fetchTokenBalance(
   } catch (err) {
     console.warn(`Failed to fetch balance for ${holderAddress} on ${contractId}:`, err);
     return null;
+  }
+}
+
+/**
+ * Triggers Freighter wallet prompt to import/track a Soroban SEP-0041 token
+ */
+export async function addTokenToFreighter(
+  contractId: string,
+  network: StellarNetwork = 'TESTNET'
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const res = await addToken({
+      contractId,
+      networkPassphrase: STELLAR_CONFIG[network].passphrase,
+    });
+    if (res?.error) {
+      return { success: false, error: res.error };
+    }
+    return { success: true };
+  } catch (err: any) {
+    console.warn(`Failed to add token ${contractId} to Freighter:`, err);
+    return { success: false, error: err?.message || 'Freighter rejected adding token' };
   }
 }

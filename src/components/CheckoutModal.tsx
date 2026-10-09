@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { ListingItem, TransferPolicy } from '../types';
 import { useWallet } from '../context/WalletContext';
-import { executePurchase } from '../lib/soroban';
-import { Zap, ShieldCheck, CheckCircle2, ExternalLink, X, AlertCircle } from 'lucide-react';
+import { executePurchase, addTokenToFreighter } from '../lib/soroban';
+import { formatAddress, NATIVE_SAC } from '../lib/stellar';
+import { Zap, ShieldCheck, CheckCircle2, ExternalLink, X, AlertCircle, Plus, Copy, Check } from 'lucide-react';
 
 interface CheckoutModalProps {
   item: ListingItem | null;
@@ -23,6 +24,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const [step, setStep] = useState<'review' | 'signing' | 'settled'>('review');
   const [txHash, setTxHash] = useState<string>('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isAddingToken, setIsAddingToken] = useState(false);
+  const [tokenAddedSuccess, setTokenAddedSuccess] = useState(false);
+  const [copiedContract, setCopiedContract] = useState(false);
 
   if (!isOpen || !item) return null;
 
@@ -209,6 +213,69 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   <ExternalLink className="w-3 h-3" />
                 </a>
               </div>
+
+              {item.assetContract && item.assetContract !== NATIVE_SAC.TESTNET ? (
+                <div className="p-4 rounded-xl bg-purple-950/30 border border-purple-500/20 text-left space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-white">Escrowed Asset Transferred to Your Wallet</span>
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-purple-500/20 text-purple-300">
+                      SEP-0041 Token
+                    </span>
+                  </div>
+                  <p className="text-xs text-zinc-300">
+                    {item.assetAmount || 1} units of <strong>{item.title}</strong> were delivered to your address{' '}
+                    <span className="font-mono text-purple-300">{shortAddress(address)}</span>.
+                  </p>
+
+                  <div className="flex flex-col sm:flex-row gap-2 pt-1">
+                    <button
+                      onClick={async () => {
+                        setIsAddingToken(true);
+                        const res = await addTokenToFreighter(item.assetContract!);
+                        setIsAddingToken(false);
+                        if (res.success) setTokenAddedSuccess(true);
+                      }}
+                      disabled={isAddingToken || tokenAddedSuccess}
+                      className="flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition-all disabled:opacity-50"
+                    >
+                      {tokenAddedSuccess ? (
+                        <>
+                          <Check className="w-3.5 h-3.5 text-emerald-300" />
+                          <span>Added to Freighter</span>
+                        </>
+                      ) : isAddingToken ? (
+                        <span>Prompting Freighter...</span>
+                      ) : (
+                        <>
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>Add Asset to Freighter Wallet</span>
+                        </>
+                      )}
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(item.assetContract!);
+                        setCopiedContract(true);
+                        setTimeout(() => setCopiedContract(false), 2000);
+                      }}
+                      className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-black/40 border border-white/10 hover:border-white/20 text-xs font-mono text-zinc-300"
+                      title="Copy Contract Address"
+                    >
+                      {copiedContract ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                      <span>{copiedContract ? 'Copied' : formatAddress(item.assetContract, 4, 4)}</span>
+                    </button>
+                  </div>
+
+                  <div className="text-[10px] text-zinc-400 border-t border-white/5 pt-2">
+                    ℹ️ In Freighter, Soroban smart contract tokens appear in the <strong>Tokens</strong> tab once added. They do not appear in the "Collectibles" tab (which is strictly for Stellar Classic NFTs).
+                  </div>
+                </div>
+              ) : (
+                <div className="p-3 rounded-xl bg-emerald-950/20 border border-emerald-500/20 text-left text-xs text-zinc-300">
+                  <span className="text-emerald-400 font-bold">Native XLM Escrow Delivered:</span> The escrowed 1 XLM has been added directly to your Stellar Lumens balance.
+                </div>
+              )}
 
               <button
                 onClick={handleResetAndClose}
