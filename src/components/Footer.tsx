@@ -1,5 +1,6 @@
 import React from 'react';
 import { Shield, ExternalLink, Github, Terminal } from 'lucide-react';
+import { TESTNET_CONTRACT_ID } from '../lib/stellar';
 
 export const Footer: React.FC = () => {
   return (
@@ -28,7 +29,7 @@ export const Footer: React.FC = () => {
               <ul className="space-y-2.5 text-xs text-zinc-400">
                 <li>
                   <a
-                    href="https://stellar.expert/explorer/testnet/contract/CDRKM3ZZXKJQ7VHCQUBO3BZWS3NDPWHSVSNDXX54ZFWEW3AMSI224T4R"
+                    href={`https://stellar.expert/explorer/testnet/contract/${TESTNET_CONTRACT_ID}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="hover:text-purple-300 flex items-center gap-1"

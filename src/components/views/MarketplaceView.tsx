@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ListingItem, AssetCategory } from '../../types';
 import { ShoppingBag, ShieldCheck, Tag, ExternalLink, Zap, Sparkles, Filter } from 'lucide-react';
 import { useWallet } from '../../context/WalletContext';
+import { formatAddress } from '../../lib/stellar';
 
 interface MarketplaceViewProps {
   items: ListingItem[];
@@ -158,9 +159,27 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
                   </p>
 
                   {/* Metadata tags */}
-                  <div className="flex items-center justify-between text-[11px] text-zinc-500 font-mono py-2.5 border-t border-b border-white/5 mb-4">
-                    <span>Seller: {shortAddress(item.seller)}</span>
-                    <span className="text-purple-400">Royalty: {(item.royaltyBps ? item.royaltyBps / 100 : 7.5)}%</span>
+                  <div className="text-[11px] text-zinc-500 font-mono py-2.5 border-t border-b border-white/5 mb-4 space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span>Seller: {shortAddress(item.seller)}</span>
+                      <span className="text-purple-400">Royalty: {(item.royaltyBps ? item.royaltyBps / 100 : 7.5)}%</span>
+                    </div>
+                    {item.assetContract && (
+                      <div className="flex items-center justify-between text-zinc-400">
+                        <span className="text-zinc-500">Asset Token:</span>
+                        <a
+                          href={`https://stellar.expert/explorer/testnet/contract/${item.assetContract}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="text-purple-300 hover:text-purple-200 flex items-center gap-1"
+                          title={item.assetContract}
+                        >
+                          <span>{formatAddress(item.assetContract, 5, 5)}</span>
+                          <ExternalLink className="w-2.5 h-2.5" />
+                        </a>
+                      </div>
+                    )}
                   </div>
 
                   {/* Price & CTA Button */}

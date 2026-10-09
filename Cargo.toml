@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "contracts/kiosk",
+    "contracts/kiosk_asset",
 ]
 resolver = "2"
 

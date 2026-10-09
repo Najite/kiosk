@@ -544,3 +544,113 @@ fn test_already_initialized_fails() {
     let res = client.try_initialize(&owner, &500, &owner, &100, &splits);
     assert_eq!(res, Err(Ok(KioskError::AlreadyInitialized)));
 }
+
+#[test]
+fn test_kiosk_custom_asset_deposit_and_withdrawal() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let kiosk_id = env.register_contract(None, KioskContract);
+    let kiosk_client = KioskContractClient::new(&env, &kiosk_id);
+
+    let owner = Address::generate(&env);
+    let seller = Address::generate(&env);
+    let splits: Vec<UpstreamSplit> = Vec::new(&env);
+    kiosk_client.initialize(&owner, &500, &owner, &100, &splits);
+
+    // Deploy custom KioskAssetContract (SEP-0041 Token)
+    let asset_id = env.register_contract(None, kiosk_asset::KioskAssetContract);
+    let asset_client = kiosk_asset::KioskAssetContractClient::new(&env, &asset_id);
+
+    let asset_admin = Address::generate(&env);
+    asset_client.initialize(
+        &asset_admin,
+        &0,
+        &String::from_str(&env, "Axon Enterprise License"),
+        &String::from_str(&env, "AXON"),
+    );
+
+    // Mint 1 asset token to seller
+    asset_client.mint(&seller, &1);
+    assert_eq!(asset_client.balance(&seller), 1);
+    assert_eq!(asset_client.balance(&kiosk_id), 0);
+
+    // Place asset into Kiosk
+    let item_id = kiosk_client.place(
+        &seller,
+        &asset_id,
+        &1,
+        &String::from_str(&env, "Axon License #001"),
+        &String::from_str(&env, "Perpetual License"),
+        &String::from_str(&env, "license"),
+    );
+
+    // Asset has moved into Kiosk custody!
+    assert_eq!(asset_client.balance(&seller), 0);
+    assert_eq!(asset_client.balance(&kiosk_id), 1);
+
+    // Seller withdraws from Kiosk
+    kiosk_client.withdraw(&seller, &item_id);
+
+    // Asset has returned to seller wallet!
+    assert_eq!(asset_client.balance(&seller), 1);
+    assert_eq!(asset_client.balance(&kiosk_id), 0);
+}
+
+#[test]
+fn test_kiosk_custom_asset_purchase_delivery() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let kiosk_id = env.register_contract(None, KioskContract);
+    let kiosk_client = KioskContractClient::new(&env, &kiosk_id);
+
+    let owner = Address::generate(&env);
+    let seller = Address::generate(&env);
+    let buyer = Address::generate(&env);
+    let royalty_recipient = Address::generate(&env);
+    let splits: Vec<UpstreamSplit> = Vec::new(&env);
+
+    kiosk_client.initialize(&owner, &1000, &royalty_recipient, &100, &splits);
+
+    // 1. Create custom asset token
+    let asset_id = env.register_contract(None, kiosk_asset::KioskAssetContract);
+    let asset_client = kiosk_asset::KioskAssetContractClient::new(&env, &asset_id);
+    asset_client.initialize(
+        &owner,
+        &0,
+        &String::from_str(&env, "Developer Pass"),
+        &String::from_str(&env, "PASS"),
+    );
+    asset_client.mint(&seller, &1);
+
+    // 2. Create payment token
+    let (payment_addr, payment_client, payment_admin) = create_token_contract(&env, &owner);
+    payment_admin.mint(&buyer, &1000);
+
+    // 3. Place & list
+    let item_id = kiosk_client.place_and_list(
+        &seller,
+        &asset_id,
+        &1,
+        &payment_addr,
+        &500,
+        &String::from_str(&env, "Developer Pass #001"),
+        &String::from_str(&env, "Access Pass"),
+        &String::from_str(&env, "pass"),
+    );
+
+    assert_eq!(asset_client.balance(&kiosk_id), 1);
+    assert_eq!(asset_client.balance(&buyer), 0);
+
+    // 4. Buyer purchases
+    kiosk_client.purchase(&buyer, &item_id);
+
+    // Verify buyer received the real custom asset token!
+    assert_eq!(asset_client.balance(&buyer), 1);
+    assert_eq!(asset_client.balance(&kiosk_id), 0);
+
+    // Verify payment routing (500 price: 10% royalty = 50, 450 net seller)
+    assert_eq!(payment_client.balance(&royalty_recipient), 50);
+    assert_eq!(payment_client.balance(&seller), 450);
+}

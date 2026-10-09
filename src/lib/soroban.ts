@@ -13,6 +13,7 @@ import { signTransaction, isConnected as isFreighterConnected } from '@stellar/f
 import {
   STELLAR_CONFIG,
   TESTNET_CONTRACT_ID,
+  DEFAULT_TESTNET_ASSET_CONTRACT,
   getEphemeralKeypair,
   getNativeSacAddress,
   stroopsToXlm,
@@ -593,4 +594,123 @@ export async function executeSetPolicy({
 
   const preparedTx = await server.prepareTransaction(baseTx);
   return await signAndSubmitTx(preparedTx, callerAddress, network);
+}
+
+export type TokenMetadata = {
+  contractId: string;
+  name: string;
+  symbol: string;
+  decimals: number;
+};
+
+/**
+ * Fetch token metadata (name, symbol, decimals) for any SEP-0041 Soroban token
+ */
+export async function fetchTokenMetadata(
+  contractId: string,
+  network: StellarNetwork = 'TESTNET',
+  callerAddress?: string
+): Promise<TokenMetadata | null> {
+  if (!contractId || !contractId.startsWith('C') || contractId.length !== 56) {
+    return null;
+  }
+  try {
+    const server = getSorobanRpc(network);
+    const contract = new Contract(contractId);
+    const simAccount = getSimulationCaller(callerAddress);
+
+    const nameTx = new TransactionBuilder(simAccount, {
+      fee: '100',
+      networkPassphrase: STELLAR_CONFIG[network].passphrase,
+    })
+      .addOperation(contract.call('name'))
+      .setTimeout(30)
+      .build();
+
+    const symbolTx = new TransactionBuilder(simAccount, {
+      fee: '100',
+      networkPassphrase: STELLAR_CONFIG[network].passphrase,
+    })
+      .addOperation(contract.call('symbol'))
+      .setTimeout(30)
+      .build();
+
+    const decimalsTx = new TransactionBuilder(simAccount, {
+      fee: '100',
+      networkPassphrase: STELLAR_CONFIG[network].passphrase,
+    })
+      .addOperation(contract.call('decimals'))
+      .setTimeout(30)
+      .build();
+
+    const [nameSim, symbolSim, decimalsSim] = await Promise.all([
+      server.simulateTransaction(nameTx).catch(() => null),
+      server.simulateTransaction(symbolTx).catch(() => null),
+      server.simulateTransaction(decimalsTx).catch(() => null),
+    ]);
+
+    const name =
+      nameSim && rpc.Api.isSimulationSuccess(nameSim) && nameSim.result?.retval
+        ? String(scValToNative(nameSim.result.retval))
+        : 'SEP-0041 Token';
+
+    const symbol =
+      symbolSim && rpc.Api.isSimulationSuccess(symbolSim) && symbolSim.result?.retval
+        ? String(scValToNative(symbolSim.result.retval))
+        : 'TOKEN';
+
+    const decimals =
+      decimalsSim && rpc.Api.isSimulationSuccess(decimalsSim) && decimalsSim.result?.retval
+        ? Number(scValToNative(decimalsSim.result.retval))
+        : 0;
+
+    return {
+      contractId,
+      name,
+      symbol,
+      decimals,
+    };
+  } catch (err) {
+    console.warn(`Failed to fetch metadata for token ${contractId}:`, err);
+    return null;
+  }
+}
+
+/**
+ * Fetch token balance for a specific address on any SEP-0041 Soroban token
+ */
+export async function fetchTokenBalance(
+  contractId: string,
+  holderAddress: string,
+  network: StellarNetwork = 'TESTNET',
+  callerAddress?: string
+): Promise<bigint | null> {
+  if (!contractId || !contractId.startsWith('C') || contractId.length !== 56) {
+    return null;
+  }
+  if (!holderAddress || !holderAddress.startsWith('G') || holderAddress.length !== 56) {
+    return null;
+  }
+  try {
+    const server = getSorobanRpc(network);
+    const contract = new Contract(contractId);
+    const simAccount = getSimulationCaller(callerAddress || holderAddress);
+
+    const tx = new TransactionBuilder(simAccount, {
+      fee: '100',
+      networkPassphrase: STELLAR_CONFIG[network].passphrase,
+    })
+      .addOperation(contract.call('balance', new Address(holderAddress).toScVal()))
+      .setTimeout(30)
+      .build();
+
+    const sim = await server.simulateTransaction(tx);
+    if (!rpc.Api.isSimulationSuccess(sim) || !sim.result?.retval) {
+      return null;
+    }
+    return BigInt(scValToNative(sim.result.retval));
+  } catch (err) {
+    console.warn(`Failed to fetch balance for ${holderAddress} on ${contractId}:`, err);
+    return null;
+  }
 }

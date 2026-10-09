@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ExternalLink, Cpu, Database, CheckCircle2 } from 'lucide-react';
-import { STELLAR_CONFIG } from '../lib/stellar';
+import { STELLAR_CONFIG, TESTNET_CONTRACT_ID, formatAddress } from '../lib/stellar';
 
 export const TelemetryBar: React.FC = () => {
   const [latency, setLatency] = useState<number | null>(null);
@@ -60,12 +60,12 @@ export const TelemetryBar: React.FC = () => {
             <Cpu className="w-3.5 h-3.5 text-purple-400" />
             <span className="text-zinc-500">CONTRACT:</span>
             <a
-              href="https://stellar.expert/explorer/testnet/contract/CDRKM3ZZXKJQ7VHCQUBO3BZWS3NDPWHSVSNDXX54ZFWEW3AMSI224T4R"
+              href={`https://stellar.expert/explorer/testnet/contract/${TESTNET_CONTRACT_ID}`}
               target="_blank"
               rel="noopener noreferrer"
               className="text-purple-300 hover:text-purple-200 flex items-center gap-1"
             >
-              <span>CDRKM3...SI224T4R</span>
+              <span>{formatAddress(TESTNET_CONTRACT_ID)}</span>
               <ExternalLink className="w-3 h-3" />
             </a>
           </div>
