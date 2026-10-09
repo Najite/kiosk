@@ -12,9 +12,9 @@ import {
 } from '../../lib/soroban';
 import {
   TESTNET_CONTRACT_ID,
-  DEFAULT_TESTNET_ASSET_CONTRACT,
   NATIVE_SAC,
   formatAddress,
+  fetchLiveAccount,
 } from '../../lib/stellar';
 import {
   Plus,
@@ -30,11 +30,21 @@ import {
   Download,
   Copy,
   Check,
-  Coins,
-  ShieldCheck,
-  HelpCircle,
+  Search,
+  Wallet,
+  Shield,
+  ArrowRight,
 } from 'lucide-react';
 import { useWallet } from '../../context/WalletContext';
+
+interface WalletAssetHolding {
+  name: string;
+  symbol: string;
+  contractId: string;
+  balanceFormatted: string;
+  balanceRaw: bigint;
+  isNative: boolean;
+}
 
 interface KioskManagerViewProps {
   items: ListingItem[];
@@ -46,82 +56,159 @@ export const KioskManagerView: React.FC<KioskManagerViewProps> = ({
   onRefreshData,
 }) => {
   const { address, shortAddress, isConnected, connectWallet, refreshBalance } = useWallet();
-  const [showMintModal, setShowMintModal] = useState(false);
+  const [showDepositModal, setShowDepositModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successTxHash, setSuccessTxHash] = useState<string | null>(null);
-  const [copiedContractId, setCopiedContractId] = useState<string | null>(null);
 
-  // Form states
+  // Inspector tool state
+  const [inspectorContractId, setInspectorContractId] = useState('');
+  const [inspectorResult, setInspectorResult] = useState<TokenMetadata | null>(null);
+  const [inspectorLoading, setInspectorLoading] = useState(false);
+
+  // Deposit Form states
+  const [depositSource, setDepositSource] = useState<'wallet' | 'custom'>('wallet');
+  const [walletHoldings, setWalletHoldings] = useState<WalletAssetHolding[]>([]);
+  const [selectedHoldingIdx, setSelectedHoldingIdx] = useState<number>(0);
+  const [isLoadingHoldings, setIsLoadingHoldings] = useState(false);
+
+  // Custom contract input state
+  const [customContractInput, setCustomContractInput] = useState('');
+  const [customMeta, setCustomMeta] = useState<TokenMetadata | null>(null);
+  const [customBalance, setCustomBalance] = useState<bigint | null>(null);
+  const [isValidatingCustom, setIsValidatingCustom] = useState(false);
+
+  // Form details
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [imageUrl, setImageUrl] = useState('');
   const [assetType, setAssetType] = useState<AssetCategory>('license');
+  const [assetAmount, setAssetAmount] = useState('1');
   const [price, setPrice] = useState('15');
   const [mintMode, setMintMode] = useState<'place_and_list' | 'place_only'>('place_and_list');
-
-  // Token asset selection
-  const [contractChoice, setContractChoice] = useState<'sep41' | 'sac' | 'custom'>('sep41');
-  const [customContractInput, setCustomContractInput] = useState('');
-  const [assetAmount, setAssetAmount] = useState('1');
-
-  // Live token balance and metadata check
-  const [userTokenBalance, setUserTokenBalance] = useState<bigint | null>(null);
-  const [tokenMeta, setTokenMeta] = useState<TokenMetadata | null>(null);
-  const [isLoadingTokenInfo, setIsLoadingTokenInfo] = useState(false);
 
   // Quick list modal state
   const [listingItemId, setListingItemId] = useState<number | null>(null);
   const [listingPrice, setListingPrice] = useState('20');
 
-  // Resolved active asset contract
-  const activeAssetContract =
-    contractChoice === 'sep41'
-      ? DEFAULT_TESTNET_ASSET_CONTRACT
-      : contractChoice === 'sac'
-      ? NATIVE_SAC.TESTNET
-      : customContractInput.trim();
-
-  // Query live on-chain balance and metadata for selected contract
-  const checkTokenInfo = useCallback(async () => {
-    if (!activeAssetContract || !activeAssetContract.startsWith('C') || activeAssetContract.length !== 56) {
-      setUserTokenBalance(null);
-      setTokenMeta(null);
+  // Load user's real wallet assets directly from Horizon and Soroban
+  const loadWalletHoldings = useCallback(async () => {
+    if (!address) {
+      setWalletHoldings([]);
       return;
     }
-    setIsLoadingTokenInfo(true);
+    setIsLoadingHoldings(true);
     try {
-      const meta = await fetchTokenMetadata(activeAssetContract);
-      setTokenMeta(meta);
+      const holdings: WalletAssetHolding[] = [];
 
-      if (address) {
-        const bal = await fetchTokenBalance(activeAssetContract, address);
-        setUserTokenBalance(bal);
-      } else {
-        setUserTokenBalance(null);
+      // 1. Always load Native XLM (SAC)
+      const acc = await fetchLiveAccount(address, 'TESTNET');
+      const xlmBal = parseFloat(acc.xlmBalance) || 0;
+      holdings.push({
+        name: 'Stellar Lumens',
+        symbol: 'XLM',
+        contractId: NATIVE_SAC.TESTNET,
+        balanceFormatted: xlmBal.toLocaleString(undefined, { maximumFractionDigits: 4 }),
+        balanceRaw: BigInt(Math.floor(xlmBal * 10_000_000)),
+        isNative: true,
+      });
+
+      // 2. Check any other issued classic assets on Horizon
+      for (const bal of acc.balances) {
+        if (bal.asset_type !== 'native' && bal.asset_code) {
+          holdings.push({
+            name: `${bal.asset_code} Token`,
+            symbol: bal.asset_code,
+            contractId: NATIVE_SAC.TESTNET, // Placeholder for SAC
+            balanceFormatted: bal.balance || '0',
+            balanceRaw: BigInt(Math.floor(parseFloat(bal.balance || '0') * 10_000_000)),
+            isNative: false,
+          });
+        }
       }
+
+      setWalletHoldings(holdings);
     } catch (err) {
-      console.warn('Failed to inspect asset contract:', err);
-      setUserTokenBalance(null);
-      setTokenMeta(null);
+      console.warn('Failed to load wallet holdings:', err);
     } finally {
-      setIsLoadingTokenInfo(false);
+      setIsLoadingHoldings(false);
     }
-  }, [activeAssetContract, address]);
+  }, [address]);
 
   useEffect(() => {
-    if (showMintModal) {
-      checkTokenInfo();
+    if (showDepositModal) {
+      loadWalletHoldings();
     }
-  }, [showMintModal, checkTokenInfo]);
+  }, [showDepositModal, loadWalletHoldings]);
 
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedContractId(text);
-    setTimeout(() => setCopiedContractId(null), 2500);
+  // Inspect custom contract in real time
+  const validateCustomContract = useCallback(async (contractId: string) => {
+    const clean = contractId.trim();
+    if (!clean.startsWith('C') || clean.length !== 56) {
+      setCustomMeta(null);
+      setCustomBalance(null);
+      return;
+    }
+    setIsValidatingCustom(true);
+    try {
+      const meta = await fetchTokenMetadata(clean);
+      setCustomMeta(meta);
+
+      if (address) {
+        const bal = await fetchTokenBalance(clean, address);
+        setCustomBalance(bal);
+      } else {
+        setCustomBalance(null);
+      }
+    } catch (err) {
+      console.warn('Custom contract validation failed:', err);
+      setCustomMeta(null);
+      setCustomBalance(null);
+    } finally {
+      setIsValidatingCustom(false);
+    }
+  }, [address]);
+
+  useEffect(() => {
+    if (depositSource === 'custom' && customContractInput.length === 56) {
+      validateCustomContract(customContractInput);
+    } else if (depositSource === 'custom' && customContractInput.length !== 56) {
+      setCustomMeta(null);
+      setCustomBalance(null);
+    }
+  }, [depositSource, customContractInput, validateCustomContract]);
+
+  // Run the standalone contract inspector
+  const handleInspectContract = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const clean = inspectorContractId.trim();
+    if (!clean.startsWith('C') || clean.length !== 56) return;
+    setInspectorLoading(true);
+    try {
+      const meta = await fetchTokenMetadata(clean);
+      setInspectorResult(meta);
+    } catch (err) {
+      console.warn('Inspection error:', err);
+      setInspectorResult(null);
+    } finally {
+      setInspectorLoading(false);
+    }
   };
 
-  const handleCreate = async (e: React.FormEvent) => {
+  // Determine active contract and balance for submission
+  const activeContractId =
+    depositSource === 'wallet'
+      ? walletHoldings[selectedHoldingIdx]?.contractId || NATIVE_SAC.TESTNET
+      : customContractInput.trim();
+
+  const activeHolding = depositSource === 'wallet' ? walletHoldings[selectedHoldingIdx] : null;
+
+  const hasZeroBalance =
+    depositSource === 'wallet'
+      ? !activeHolding || activeHolding.balanceRaw <= 0n
+      : customBalance !== null && customBalance <= 0n;
+
+  const handleDepositSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title || !description) return;
 
@@ -130,8 +217,13 @@ export const KioskManagerView: React.FC<KioskManagerViewProps> = ({
       return;
     }
 
-    if (!activeAssetContract || !activeAssetContract.startsWith('C') || activeAssetContract.length !== 56) {
+    if (!activeContractId || !activeContractId.startsWith('C') || activeContractId.length !== 56) {
       setErrorMessage('Please specify a valid 56-character Soroban contract ID starting with C.');
+      return;
+    }
+
+    if (hasZeroBalance) {
+      setErrorMessage('Cannot deposit: Your connected wallet holds 0 balance of this token on-chain.');
       return;
     }
 
@@ -155,7 +247,7 @@ export const KioskManagerView: React.FC<KioskManagerViewProps> = ({
       if (mintMode === 'place_and_list') {
         res = await executePlaceAndList({
           sellerAddress: address,
-          assetContract: activeAssetContract,
+          assetContract: activeContractId,
           assetAmount: parsedAmount,
           title,
           description: fullDescription,
@@ -165,7 +257,7 @@ export const KioskManagerView: React.FC<KioskManagerViewProps> = ({
       } else {
         res = await executePlace({
           sellerAddress: address,
-          assetContract: activeAssetContract,
+          assetContract: activeContractId,
           assetAmount: parsedAmount,
           title,
           description: fullDescription,
@@ -176,15 +268,15 @@ export const KioskManagerView: React.FC<KioskManagerViewProps> = ({
       setSuccessTxHash(res.txHash);
       await onRefreshData();
       await refreshBalance();
-      await checkTokenInfo();
+      await loadWalletHoldings();
 
       setTitle('');
       setDescription('');
       setImageUrl('');
       setPrice('15');
-      setShowMintModal(false);
+      setShowDepositModal(false);
     } catch (err: any) {
-      console.error('Vault placement failed:', err);
+      console.error('Vault deposit failed:', err);
       setErrorMessage(err?.message || 'Transaction rejected by Soroban RPC node.');
     } finally {
       setIsSubmitting(false);
@@ -227,6 +319,7 @@ export const KioskManagerView: React.FC<KioskManagerViewProps> = ({
       setSuccessTxHash(res.txHash);
       await onRefreshData();
       await refreshBalance();
+      await loadWalletHoldings();
     } catch (err: any) {
       console.error('Withdrawal failed:', err);
       setErrorMessage(err?.message || 'Withdrawal failed on Soroban.');
@@ -266,7 +359,7 @@ export const KioskManagerView: React.FC<KioskManagerViewProps> = ({
         <div>
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-500/10 border border-purple-500/20 text-purple-300 text-xs font-mono mb-3">
             <Lock className="w-3.5 h-3.5" />
-            <span>On-Chain Vault Storage</span>
+            <span>Autonomous Vault Custody</span>
           </div>
           <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
             Kiosk Vault Manager
@@ -279,12 +372,12 @@ export const KioskManagerView: React.FC<KioskManagerViewProps> = ({
         <button
           onClick={() => {
             setErrorMessage(null);
-            setShowMintModal(true);
+            setShowDepositModal(true);
           }}
           className="flex items-center gap-2 px-6 py-3 rounded-full bg-gradient-to-r from-purple-600 to-violet-600 text-white text-xs font-bold hover:from-purple-500 hover:to-violet-500 transition-all shadow-[0_0_25px_rgba(168,85,247,0.4)]"
         >
           <Plus className="w-4 h-4" />
-          <span>Mint & List On-Chain</span>
+          <span>Deposit Asset into Vault</span>
         </button>
       </div>
 
@@ -304,7 +397,7 @@ export const KioskManagerView: React.FC<KioskManagerViewProps> = ({
             className="flex items-center gap-1 text-emerald-400 hover:text-emerald-300 text-xs font-mono underline"
           >
             <span>Explorer Receipt</span>
-            <ExternalLink className="w-3.5 h-3.5" />
+            <ExternalLink className="w-3 h-3" />
           </a>
         </div>
       )}
@@ -316,80 +409,84 @@ export const KioskManagerView: React.FC<KioskManagerViewProps> = ({
         </div>
       )}
 
-      {/* Freighter Wallet Token Integration Guide Box */}
+      {/* Protocol Architecture Telemetry Strip */}
       <div className="mb-10 double-bezel-outer">
         <div className="double-bezel-inner p-5 sm:p-6 bg-[#0c0c16]/80">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-white/5 pb-4 mb-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-purple-500/10 text-purple-400 flex items-center justify-center shrink-0">
-                <Coins className="w-5 h-5" />
+                <Shield className="w-5 h-5" />
               </div>
               <div>
                 <h4 className="text-sm font-bold text-white flex items-center gap-2">
-                  <span>SEP-0041 Standard Asset Token</span>
-                  <span className="px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[10px] font-mono">
-                    AXON
+                  <span>Sui-Style Kiosk Standard on Stellar</span>
+                  <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-mono">
+                    Asset-Agnostic
                   </span>
                 </h4>
                 <p className="text-xs text-zinc-400 mt-0.5">
-                  Real Soroban fungible/non-fungible token deployed on Stellar Testnet for Kiosk escrow and delivery.
+                  Universal non-custodial vault: escrow any SEP-0041 token or Stellar Asset Contract (SAC) with enforceable transfer policies.
                 </p>
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                onClick={() => copyToClipboard(DEFAULT_TESTNET_ASSET_CONTRACT)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-zinc-300 hover:text-white border border-white/10 text-xs font-mono transition-all"
-                title="Copy contract ID to import into Freighter"
-              >
-                {copiedContractId === DEFAULT_TESTNET_ASSET_CONTRACT ? (
-                  <>
-                    <Check className="w-3.5 h-3.5 text-emerald-400" />
-                    <span className="text-emerald-400">Copied Contract ID</span>
-                  </>
-                ) : (
-                  <>
-                    <Copy className="w-3.5 h-3.5" />
-                    <span>Copy Token Contract ID</span>
-                  </>
-                )}
-              </button>
-
+            <div className="flex items-center gap-2 text-xs font-mono">
+              <span className="text-zinc-500">Contract:</span>
               <a
-                href={`https://stellar.expert/explorer/testnet/contract/${DEFAULT_TESTNET_ASSET_CONTRACT}`}
+                href={`https://stellar.expert/explorer/testnet/contract/${TESTNET_CONTRACT_ID}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/30 text-xs font-mono transition-all"
+                className="text-purple-300 hover:text-purple-200 flex items-center gap-1"
               >
-                <span>Stellar Expert</span>
+                <span>{formatAddress(TESTNET_CONTRACT_ID, 6, 6)}</span>
                 <ExternalLink className="w-3 h-3" />
               </a>
             </div>
           </div>
 
-          {/* Freighter Step-by-Step Instructions */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
-            <div className="p-3 rounded-xl bg-black/40 border border-white/5">
-              <div className="text-purple-400 font-mono text-[11px] mb-1 font-semibold">1. OPEN FREIGHTER</div>
-              <p className="text-zinc-400 text-[11px] leading-relaxed">
-                Ensure network is switched to <strong>Testnet</strong> in Freighter settings, then click <strong>Manage Assets</strong> (or scroll down on asset tab).
-              </p>
-            </div>
+          {/* Real-time Contract Inspector Tool */}
+          <div className="pt-1">
+            <div className="text-[11px] font-mono text-zinc-400 mb-2">INSPECT ANY SOROBAN CONTRACT ON TESTNET:</div>
+            <form onSubmit={handleInspectContract} className="flex flex-col sm:flex-row gap-2">
+              <div className="relative flex-1">
+                <input
+                  type="text"
+                  placeholder="Paste 56-char Contract ID starting with C..."
+                  value={inspectorContractId}
+                  onChange={(e) => setInspectorContractId(e.target.value)}
+                  className="w-full pl-9 pr-3 py-2 rounded-xl bg-black/40 border border-white/10 text-white text-xs font-mono focus:outline-none focus:border-purple-500"
+                />
+                <Search className="w-3.5 h-3.5 text-zinc-500 absolute left-3 top-3" />
+              </div>
+              <button
+                type="submit"
+                disabled={inspectorLoading || inspectorContractId.trim().length !== 56}
+                className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-medium text-zinc-300 hover:text-white transition-all disabled:opacity-40"
+              >
+                {inspectorLoading ? 'Querying...' : 'Query On-Chain Metadata'}
+              </button>
+            </form>
 
-            <div className="p-3 rounded-xl bg-black/40 border border-white/5">
-              <div className="text-purple-400 font-mono text-[11px] mb-1 font-semibold">2. ADD TOKEN</div>
-              <p className="text-zinc-400 text-[11px] leading-relaxed">
-                Click <strong>Add Token</strong> and paste the full 56-character Contract ID starting with <code className="text-purple-300 bg-purple-950/60 px-1 py-0.5 rounded">CA2B4Q...</code>.
-              </p>
-            </div>
-
-            <div className="p-3 rounded-xl bg-black/40 border border-white/5">
-              <div className="text-purple-400 font-mono text-[11px] mb-1 font-semibold">3. CONFIRM & VIEW BALANCE</div>
-              <p className="text-zinc-400 text-[11px] leading-relaxed">
-                Click <strong>Add</strong>. Freighter instantly detects token symbol <strong>AXON</strong> and renders your real on-chain balance!
-              </p>
-            </div>
+            {inspectorResult && (
+              <div className="mt-3 p-3 rounded-xl bg-purple-950/20 border border-purple-500/20 flex flex-wrap items-center justify-between gap-3 text-xs font-mono">
+                <div className="flex items-center gap-4">
+                  <span className="text-white font-bold">{inspectorResult.name}</span>
+                  <span className="px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300">
+                    {inspectorResult.symbol}
+                  </span>
+                  <span className="text-zinc-500">Decimals: {inspectorResult.decimals}</span>
+                </div>
+                <a
+                  href={`https://stellar.expert/explorer/testnet/contract/${inspectorResult.contractId}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-purple-300 hover:text-purple-200 flex items-center gap-1"
+                >
+                  <span>Stellar Expert Explorer</span>
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -438,7 +535,7 @@ export const KioskManagerView: React.FC<KioskManagerViewProps> = ({
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
           <h3 className="text-lg font-bold text-white">Live On-Chain Holdings</h3>
           <div className="flex items-center gap-2">
-            <span className="text-xs text-zinc-500 font-mono">Kiosk Contract:</span>
+            <span className="text-xs text-zinc-500 font-mono">Contract:</span>
             <a
               href={`https://stellar.expert/explorer/testnet/contract/${TESTNET_CONTRACT_ID}`}
               target="_blank"
@@ -593,8 +690,8 @@ export const KioskManagerView: React.FC<KioskManagerViewProps> = ({
         </div>
       )}
 
-      {/* Mint / Deposit Modal */}
-      {showMintModal && (
+      {/* Rebuilt, Asset-Agnostic Deposit Modal */}
+      {showDepositModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xl animate-in fade-in">
           <div className="relative w-full max-w-lg double-bezel-outer max-h-[90vh] overflow-y-auto">
             <div className="double-bezel-inner p-6 sm:p-8">
@@ -604,14 +701,14 @@ export const KioskManagerView: React.FC<KioskManagerViewProps> = ({
                     <Plus className="w-4 h-4" />
                   </div>
                   <div>
-                    <h3 className="text-lg font-bold text-white">On-Chain Asset Vault Deposit</h3>
+                    <h3 className="text-lg font-bold text-white">Deposit Asset into Vault</h3>
                     <div className="text-[10px] font-mono text-zinc-400">
-                      {mintMode === 'place_and_list' ? 'place_and_list() entry point' : 'place() entry point'}
+                      {mintMode === 'place_and_list' ? 'Atomic place_and_list()' : 'Custodial place()'}
                     </div>
                   </div>
                 </div>
                 <button
-                  onClick={() => setShowMintModal(false)}
+                  onClick={() => setShowDepositModal(false)}
                   disabled={isSubmitting}
                   className="text-zinc-500 hover:text-white text-xs font-mono"
                 >
@@ -619,8 +716,8 @@ export const KioskManagerView: React.FC<KioskManagerViewProps> = ({
                 </button>
               </div>
 
-              {/* Mode Toggle */}
-              <div className="flex items-center gap-2 p-1 rounded-xl bg-[#0c0c14] border border-white/5 mb-4 text-xs">
+              {/* Mode Toggle (Place & List vs Place Only) */}
+              <div className="flex items-center gap-2 p-1 rounded-xl bg-[#0c0c14] border border-white/5 mb-5 text-xs">
                 <button
                   type="button"
                   onClick={() => setMintMode('place_and_list')}
@@ -652,106 +749,145 @@ export const KioskManagerView: React.FC<KioskManagerViewProps> = ({
                 </div>
               )}
 
-              <form onSubmit={handleCreate} className="space-y-4">
-                {/* Asset Contract Selector */}
-                <div className="p-4 rounded-xl bg-[#0c0c14] border border-white/10 space-y-3">
-                  <label className="block text-xs font-semibold text-white">
-                    Escrow Asset Token Contract
-                  </label>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
-                    <button
-                      type="button"
-                      onClick={() => setContractChoice('sep41')}
-                      className={`p-2.5 rounded-lg border text-left transition-all ${
-                        contractChoice === 'sep41'
-                          ? 'bg-purple-600/20 border-purple-500/60 text-white font-medium'
-                          : 'bg-black/30 border-white/5 text-zinc-400 hover:text-white'
-                      }`}
-                    >
-                      <div className="font-semibold text-purple-300">Axon Token</div>
-                      <div className="text-[10px] text-zinc-400 font-mono">SEP-0041 Standard</div>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setContractChoice('sac')}
-                      className={`p-2.5 rounded-lg border text-left transition-all ${
-                        contractChoice === 'sac'
-                          ? 'bg-purple-600/20 border-purple-500/60 text-white font-medium'
-                          : 'bg-black/30 border-white/5 text-zinc-400 hover:text-white'
-                      }`}
-                    >
-                      <div className="font-semibold text-purple-300">Native XLM</div>
-                      <div className="text-[10px] text-zinc-400 font-mono">Stellar SAC</div>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setContractChoice('custom')}
-                      className={`p-2.5 rounded-lg border text-left transition-all ${
-                        contractChoice === 'custom'
-                          ? 'bg-purple-600/20 border-purple-500/60 text-white font-medium'
-                          : 'bg-black/30 border-white/5 text-zinc-400 hover:text-white'
-                      }`}
-                    >
-                      <div className="font-semibold text-purple-300">Custom Token</div>
-                      <div className="text-[10px] text-zinc-400 font-mono">Any Soroban ID</div>
-                    </button>
+              <form onSubmit={handleDepositSubmit} className="space-y-4">
+                {/* Asset Source Selection Tabs */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-xs font-semibold text-white">Select Asset to Deposit</label>
+                    <div className="flex items-center gap-1 text-[11px] font-mono">
+                      <button
+                        type="button"
+                        onClick={() => setDepositSource('wallet')}
+                        className={`px-2.5 py-1 rounded-md transition-all ${
+                          depositSource === 'wallet'
+                            ? 'bg-purple-600/30 text-purple-300 border border-purple-500/40'
+                            : 'text-zinc-500 hover:text-zinc-300'
+                        }`}
+                      >
+                        From My Wallet
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDepositSource('custom')}
+                        className={`px-2.5 py-1 rounded-md transition-all ${
+                          depositSource === 'custom'
+                            ? 'bg-purple-600/30 text-purple-300 border border-purple-500/40'
+                            : 'text-zinc-500 hover:text-zinc-300'
+                        }`}
+                      >
+                        Custom Contract ID
+                      </button>
+                    </div>
                   </div>
 
-                  {contractChoice === 'custom' && (
-                    <div>
-                      <input
-                        type="text"
-                        required
-                        placeholder="Paste 56-char Contract ID starting with C..."
-                        value={customContractInput}
-                        onChange={(e) => setCustomContractInput(e.target.value)}
-                        className="w-full px-3 py-2 rounded-lg bg-black/50 border border-white/10 text-white text-xs font-mono focus:outline-none focus:border-purple-500"
-                      />
+                  {depositSource === 'wallet' ? (
+                    <div className="space-y-2">
+                      {isLoadingHoldings ? (
+                        <div className="p-4 rounded-xl bg-black/40 border border-white/5 text-center text-xs text-zinc-500">
+                          Loading wallet assets from Stellar...
+                        </div>
+                      ) : walletHoldings.length === 0 ? (
+                        <div className="p-4 rounded-xl bg-black/40 border border-white/5 text-center text-xs text-zinc-400">
+                          {isConnected
+                            ? 'No assets found in your connected wallet.'
+                            : 'Please connect your wallet to detect your assets.'}
+                        </div>
+                      ) : (
+                        <div className="space-y-2 max-h-48 overflow-y-auto">
+                          {walletHoldings.map((h, idx) => (
+                            <div
+                              key={idx}
+                              onClick={() => setSelectedHoldingIdx(idx)}
+                              className={`p-3 rounded-xl border cursor-pointer transition-all flex items-center justify-between ${
+                                selectedHoldingIdx === idx
+                                  ? 'bg-purple-600/15 border-purple-500/50 text-white'
+                                  : 'bg-black/30 border-white/5 text-zinc-400 hover:border-white/20'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2.5">
+                                <div className="w-7 h-7 rounded-lg bg-purple-500/10 text-purple-400 flex items-center justify-center text-xs font-bold">
+                                  {h.symbol.slice(0, 3)}
+                                </div>
+                                <div>
+                                  <div className="text-xs font-bold text-white flex items-center gap-2">
+                                    <span>{h.name}</span>
+                                    {h.isNative && (
+                                      <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-purple-500/20 text-purple-300">
+                                        SAC
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="text-[10px] font-mono text-zinc-500">
+                                    {formatAddress(h.contractId, 6, 6)}
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="text-right">
+                                <div className="text-xs font-bold font-mono text-white">
+                                  {h.balanceFormatted} {h.symbol}
+                                </div>
+                                <div className="text-[10px] font-mono text-emerald-400">Available</div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <div>
+                        <input
+                          type="text"
+                          required
+                          placeholder="Paste 56-character Contract ID starting with C..."
+                          value={customContractInput}
+                          onChange={(e) => setCustomContractInput(e.target.value)}
+                          className="w-full px-3 py-2.5 rounded-xl bg-black/50 border border-white/10 text-white text-xs font-mono focus:outline-none focus:border-purple-500"
+                        />
+                      </div>
+
+                      {isValidatingCustom ? (
+                        <div className="p-3 rounded-xl bg-black/40 border border-white/5 text-xs text-zinc-400 text-center font-mono">
+                          Simulating Soroban contract metadata...
+                        </div>
+                      ) : customMeta ? (
+                        <div className="p-3 rounded-xl bg-purple-950/20 border border-purple-500/30 text-xs font-mono space-y-1">
+                          <div className="flex items-center justify-between">
+                            <span className="text-zinc-400">Token Detected:</span>
+                            <span className="text-white font-bold">
+                              {customMeta.name} ({customMeta.symbol})
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-zinc-400">Your Wallet Balance:</span>
+                            <span className="text-white font-bold">
+                              {customBalance !== null ? `${customBalance.toString()} ${customMeta.symbol}` : '0'}
+                            </span>
+                          </div>
+                        </div>
+                      ) : customContractInput.length === 56 ? (
+                        <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs font-mono">
+                          Could not resolve SEP-0041 metadata on this contract ID.
+                        </div>
+                      ) : null}
                     </div>
                   )}
 
-                  {/* Active Asset Contract Telemetry & Balance */}
-                  <div className="pt-2 border-t border-white/5 flex flex-col gap-1.5 text-[11px] font-mono">
-                    <div className="flex items-center justify-between text-zinc-400">
-                      <span>Contract:</span>
-                      <span className="text-zinc-300" title={activeAssetContract}>
-                        {formatAddress(activeAssetContract, 8, 8)}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center justify-between text-zinc-400">
-                      <span>Your Wallet Balance:</span>
-                      <span className="text-white font-bold">
-                        {isLoadingTokenInfo ? (
-                          <span className="text-zinc-500">Checking...</span>
-                        ) : userTokenBalance !== null ? (
-                          `${userTokenBalance.toString()} ${tokenMeta?.symbol || 'Units'}`
-                        ) : isConnected ? (
-                          '0 Units'
-                        ) : (
-                          'Connect Wallet'
-                        )}
-                      </span>
-                    </div>
-
-                    {/* Low Balance Warning */}
-                    {isConnected && userTokenBalance !== null && userTokenBalance === 0n && (
-                      <div className="mt-1 p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300 text-[11px] leading-relaxed flex items-start gap-2 font-sans">
-                        <AlertCircle className="w-4 h-4 shrink-0 text-amber-400 mt-0.5" />
-                        <div>
-                          <strong>Zero Balance:</strong> Your wallet currently holds 0 units of this token. Placing it into the Kiosk vault requires transferring from your wallet; Soroban will reject the call with <code>Error(Contract, #5)</code> if unfunded.
-                        </div>
+                  {/* Zero Balance Warning if user tries to escrow asset they don't own */}
+                  {hasZeroBalance && isConnected && (
+                    <div className="mt-2.5 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-start gap-2">
+                      <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-amber-400" />
+                      <div>
+                        <strong>Insufficient Balance:</strong> Your wallet currently holds 0 units of this asset. In Soroban, depositing into the Kiosk vault transfers tokens from your wallet into the contract; you must hold tokens to deposit them.
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-medium text-zinc-400 mb-1.5">Asset Amount</label>
+                    <label className="block text-xs font-medium text-zinc-400 mb-1.5">Quantity to Escrow</label>
                     <input
                       type="number"
                       required
@@ -759,12 +895,12 @@ export const KioskManagerView: React.FC<KioskManagerViewProps> = ({
                       step="1"
                       value={assetAmount}
                       onChange={(e) => setAssetAmount(e.target.value)}
-                      className="w-full px-4 py-2.5 rounded-xl bg-[#0c0c14] border border-white/10 text-white text-xs focus:outline-none focus:border-purple-500"
+                      className="w-full px-4 py-2.5 rounded-xl bg-[#0c0c14] border border-white/10 text-white text-xs focus:outline-none focus:border-purple-500 font-mono"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-medium text-zinc-400 mb-1.5">Asset Category</label>
+                    <label className="block text-xs font-medium text-zinc-400 mb-1.5">Asset Classification</label>
                     <select
                       value={assetType}
                       onChange={(e) => setAssetType(e.target.value as AssetCategory)}
@@ -773,17 +909,17 @@ export const KioskManagerView: React.FC<KioskManagerViewProps> = ({
                       <option value="license">API License</option>
                       <option value="pass">Developer Pass</option>
                       <option value="badge">Credential Badge</option>
-                      <option value="collectible">Collectible</option>
+                      <option value="collectible">Digital Collectible</option>
                     </select>
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-zinc-400 mb-1.5">Asset Title</label>
+                  <label className="block text-xs font-medium text-zinc-400 mb-1.5">Listing Title</label>
                   <input
                     type="text"
                     required
-                    placeholder="e.g. Horizon Developer License Pass"
+                    placeholder="e.g. Production Enterprise Developer Pass"
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
                     className="w-full px-4 py-2.5 rounded-xl bg-[#0c0c14] border border-white/10 text-white text-xs focus:outline-none focus:border-purple-500"
@@ -791,11 +927,11 @@ export const KioskManagerView: React.FC<KioskManagerViewProps> = ({
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-zinc-400 mb-1.5">Description</label>
+                  <label className="block text-xs font-medium text-zinc-400 mb-1.5">Terms / Utility Description</label>
                   <textarea
                     required
                     rows={2}
-                    placeholder="Describe the utility or terms..."
+                    placeholder="Describe license utility, access privileges, or verification terms..."
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
                     className="w-full px-4 py-2.5 rounded-xl bg-[#0c0c14] border border-white/10 text-white text-xs focus:outline-none focus:border-purple-500"
@@ -804,11 +940,11 @@ export const KioskManagerView: React.FC<KioskManagerViewProps> = ({
 
                 <div>
                   <label className="block text-xs font-medium text-zinc-400 mb-1.5">
-                    Image / Media URI <span className="text-zinc-500 font-normal">(Optional HTTPS or IPFS)</span>
+                    Media / Artwork URI <span className="text-zinc-500 font-normal">(Optional HTTPS or IPFS)</span>
                   </label>
                   <input
                     type="url"
-                    placeholder="https://images.unsplash.com/... or ipfs://..."
+                    placeholder="https://... or ipfs://..."
                     value={imageUrl}
                     onChange={(e) => setImageUrl(e.target.value)}
                     className="w-full px-4 py-2.5 rounded-xl bg-[#0c0c14] border border-white/10 text-white text-xs focus:outline-none focus:border-purple-500 font-mono placeholder:text-zinc-600"
@@ -817,7 +953,7 @@ export const KioskManagerView: React.FC<KioskManagerViewProps> = ({
 
                 {mintMode === 'place_and_list' && (
                   <div>
-                    <label className="block text-xs font-medium text-zinc-400 mb-1.5">Price (XLM)</label>
+                    <label className="block text-xs font-medium text-zinc-400 mb-1.5">Listing Price (XLM)</label>
                     <input
                       type="number"
                       required
@@ -825,24 +961,24 @@ export const KioskManagerView: React.FC<KioskManagerViewProps> = ({
                       step="1"
                       value={price}
                       onChange={(e) => setPrice(e.target.value)}
-                      className="w-full px-4 py-2.5 rounded-xl bg-[#0c0c14] border border-white/10 text-white text-xs focus:outline-none focus:border-purple-500"
+                      className="w-full px-4 py-2.5 rounded-xl bg-[#0c0c14] border border-white/10 text-white text-xs focus:outline-none focus:border-purple-500 font-mono"
                     />
                   </div>
                 )}
 
-                <div className="pt-4 flex items-center justify-end gap-3">
+                <div className="pt-4 flex items-center justify-end gap-3 border-t border-white/5">
                   <button
                     type="button"
                     disabled={isSubmitting}
-                    onClick={() => setShowMintModal(false)}
+                    onClick={() => setShowDepositModal(false)}
                     className="px-4 py-2 rounded-full text-xs text-zinc-400 hover:text-white"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    disabled={isSubmitting}
-                    className="flex items-center gap-2 px-6 py-2.5 rounded-full bg-gradient-to-r from-purple-600 to-violet-600 text-white text-xs font-bold hover:from-purple-500 hover:to-violet-500 transition-all shadow-[0_0_20px_rgba(168,85,247,0.4)] disabled:opacity-50"
+                    disabled={isSubmitting || hasZeroBalance}
+                    className="flex items-center gap-2 px-6 py-2.5 rounded-full bg-gradient-to-r from-purple-600 to-violet-600 text-white text-xs font-bold hover:from-purple-500 hover:to-violet-500 transition-all shadow-[0_0_20px_rgba(168,85,247,0.4)] disabled:opacity-40 disabled:cursor-not-allowed"
                   >
                     {isSubmitting ? (
                       <>
