@@ -33,12 +33,12 @@ export const Hero: React.FC<HeroProps> = ({
             <span className="text-purple-400">● Testnet Active</span>
             <span className="text-zinc-600">|</span>
             <a
-              href="https://stellar.expert/explorer/testnet/contract/CB3AQGQ6MXJVJ26ICU5CDIGSVUKS2LNCEBMZEVM2GO6RARSJ367CLQQB"
+              href="https://stellar.expert/explorer/testnet/contract/CDRKM3ZZXKJQ7VHCQUBO3BZWS3NDPWHSVSNDXX54ZFWEW3AMSI224T4R"
               target="_blank"
               rel="noopener noreferrer"
               className="hover:text-purple-300 flex items-center gap-1 transition-colors"
             >
-              <span>Contract: CB3AQG...67CLQQB</span>
+              <span>Contract: CDRKM3...SI224T4R</span>
               <ExternalLink className="w-3 h-3 text-purple-400" />
             </a>
           </div>
@@ -83,7 +83,7 @@ export const Hero: React.FC<HeroProps> = ({
 
               {/* Testnet Explorer Link */}
               <a
-                href="https://stellar.expert/explorer/testnet/contract/CB3AQGQ6MXJVJ26ICU5CDIGSVUKS2LNCEBMZEVM2GO6RARSJ367CLQQB"
+                href="https://stellar.expert/explorer/testnet/contract/CDRKM3ZZXKJQ7VHCQUBO3BZWS3NDPWHSVSNDXX54ZFWEW3AMSI224T4R"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-1.5 px-4 py-3 rounded-full bg-purple-600/15 border border-purple-500/30 text-purple-300 text-xs font-mono hover:bg-purple-600/25 transition-all"

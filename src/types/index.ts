@@ -20,8 +20,12 @@ export interface ListingItem {
   title: string;
   description: string;
   assetType: AssetCategory;
-  price: number; // In XLM
+  assetContract?: string;
+  assetAmount?: number;
+  paymentToken?: string;
+  price: number; // In XLM or payment token
   isListed: boolean;
+  status: 'placed' | 'listed' | 'sold';
   royaltyBps?: number;
   badge?: string;
   image?: string;

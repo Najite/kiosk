@@ -18,7 +18,7 @@ export const WidgetEmbedView: React.FC = () => {
 export function CheckoutPage() {
   return (
     <StellarKioskButton
-      contractId="CB3AQGQ6MXJVJ26ICU5CDIGSVUKS2LNCEBMZEVM2GO6RARSJ367CLQQB"
+      contractId="CDRKM3ZZXKJQ7VHCQUBO3BZWS3NDPWHSVSNDXX54ZFWEW3AMSI224T4R"
       itemId={1}
       network="testnet"
       theme="${theme}"
@@ -34,7 +34,7 @@ export function CheckoutPage() {
 
 <!-- Drop-in Kiosk Checkout Button -->
 <stellar-kiosk-button
-  contract="CB3AQGQ6MXJVJ26ICU5CDIGSVUKS2LNCEBMZEVM2GO6RARSJ367CLQQB"
+  contract="CDRKM3ZZXKJQ7VHCQUBO3BZWS3NDPWHSVSNDXX54ZFWEW3AMSI224T4R"
   item-id="1"
   network="testnet"
   theme="${theme}"

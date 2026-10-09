@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { TransferPolicy, UpstreamSplit } from '../../types';
 import { executeSetPolicy } from '../../lib/soroban';
-import { DEMO_TESTNET_KEYPAIR } from '../../lib/stellar';
 import { ShieldAlert, Plus, Trash2, CheckCircle2, Lock, Save, ExternalLink, Sliders, AlertCircle, RefreshCw } from 'lucide-react';
 import { useWallet } from '../../context/WalletContext';
 
@@ -64,9 +63,8 @@ export const PolicyEngineView: React.FC<PolicyEngineViewProps> = ({
     setSuccessTxHash(null);
 
     try {
-      const activeAddress = address || DEMO_TESTNET_KEYPAIR.publicKey;
       const res = await executeSetPolicy({
-        callerAddress: activeAddress,
+        callerAddress: address,
         royaltyBps,
         royaltyRecipient,
         minFloorPriceInXlm: minFloorPrice,

@@ -120,8 +120,11 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
               {/* Fee Decomposition */}
               <div className="space-y-2.5 p-4 rounded-2xl bg-white/[0.02] border border-white/5">
-                <div className="text-xs font-bold text-zinc-300 uppercase tracking-wider font-mono mb-2">
-                  Atomic Payment Routing
+                <div className="flex items-center justify-between text-xs font-bold text-zinc-300 uppercase tracking-wider font-mono mb-2">
+                  <span>Atomic Payment Routing</span>
+                  <span className="text-[10px] text-purple-400 font-normal">
+                    Token: {item.paymentToken ? shortAddress(item.paymentToken) : 'XLM (SAC)'}
+                  </span>
                 </div>
 
                 <div className="flex justify-between text-xs">
@@ -138,12 +141,21 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   <span className="text-zinc-400">Upstream Protocol Split ({(upstreamPct * 100).toFixed(1)}%)</span>
                   <span className="text-fuchsia-300 font-mono">{upstreamAmount.toFixed(2)} XLM</span>
                 </div>
+
+                {item.assetContract && (
+                  <div className="pt-2 border-t border-white/5 flex justify-between text-[11px] font-mono text-zinc-400">
+                    <span>Escrowed Asset Delivery</span>
+                    <span className="text-emerald-400 truncate max-w-[200px]">
+                      {item.assetAmount || 1} unit(s) of {shortAddress(item.assetContract)}
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/* Invariant guarantee banner */}
               <div className="flex items-center gap-2 p-3 rounded-xl bg-purple-950/40 border border-purple-500/20 text-xs text-purple-200">
                 <ShieldCheck className="w-4 h-4 text-purple-400 shrink-0" />
-                <span>Executing on Soroban Contract <span className="font-mono text-[10px]">CB3AQG...</span></span>
+                <span>Non-Custodial Escrow: Atomic delivery directly to your wallet upon settlement.</span>
               </div>
 
               {/* Action Button */}

@@ -13,7 +13,7 @@ import { signTransaction, isConnected as isFreighterConnected } from '@stellar/f
 import {
   STELLAR_CONFIG,
   TESTNET_CONTRACT_ID,
-  DEMO_TESTNET_KEYPAIR,
+  getEphemeralKeypair,
   getNativeSacAddress,
   stroopsToXlm,
   xlmToStroops,
@@ -44,9 +44,13 @@ export type OnChainItem = {
   title: string;
   description: string;
   assetType: string;
+  assetContract: string;
+  assetAmount: bigint;
+  paymentToken: string;
   price: bigint;
   isListed: boolean;
   seller: string;
+  status: 'placed' | 'listed' | 'sold';
 };
 
 export function getSorobanRpc(network: StellarNetwork = 'TESTNET'): rpc.Server {
@@ -159,14 +163,27 @@ export async function fetchContractItem(
     }
 
     const val = scValToNative(sim.result.retval);
+    let statusVal: 'placed' | 'listed' | 'sold' = 'placed';
+    if (val.status === 3 || val.status === '3' || val.status === 'Sold' || val.status?.name === 'Sold') {
+      statusVal = 'sold';
+    } else if (val.status === 2 || val.status === '2' || val.status === 'Listed' || val.status?.name === 'Listed' || Boolean(val.is_listed)) {
+      statusVal = 'listed';
+    } else {
+      statusVal = 'placed';
+    }
+
     return {
       id: Number(val.id),
       title: String(val.title ?? ''),
       description: String(val.description ?? ''),
       assetType: String(val.asset_type ?? 'License'),
+      assetContract: String(val.asset_contract ?? ''),
+      assetAmount: BigInt(val.asset_amount ?? 1),
+      paymentToken: String(val.payment_token ?? ''),
       price: BigInt(val.price ?? 0),
       isListed: Boolean(val.is_listed),
       seller: String(val.seller ?? ''),
+      status: statusVal,
     };
   } catch (err) {
     console.warn(`Failed to fetch on-chain item ${itemId}:`, err);
@@ -205,18 +222,18 @@ async function signAndSubmitTx(
   let txToSend = preparedTx;
 
   const isFreighter = await isFreighterConnected().catch(() => false);
+  const ephemeralKp = getEphemeralKeypair();
 
-  if (isFreighter && callerAddress !== DEMO_TESTNET_KEYPAIR.publicKey) {
+  if (isFreighter && (!ephemeralKp || callerAddress !== ephemeralKp.publicKey())) {
     const signedRes: any = await signTransaction(preparedTx.toXDR(), {
       networkPassphrase: STELLAR_CONFIG[network].passphrase,
     });
     const xdrString = typeof signedRes === 'string' ? signedRes : signedRes?.signedTxXdr || preparedTx.toXDR();
     txToSend = TransactionBuilder.fromXDR(xdrString, STELLAR_CONFIG[network].passphrase);
-
+  } else if (ephemeralKp && callerAddress === ephemeralKp.publicKey()) {
+    txToSend.sign(ephemeralKp);
   } else {
-    // Sign with live funded Testnet demo keypair
-    const kp = Keypair.fromSecret(DEMO_TESTNET_KEYPAIR.secret);
-    txToSend.sign(kp);
+    throw new Error(`No signing key available for ${callerAddress}. Please connect Freighter or use an ephemeral testnet wallet.`);
   }
 
   const sendRes = await server.sendTransaction(txToSend);
@@ -235,22 +252,19 @@ async function signAndSubmitTx(
 }
 
 /**
- * Executes a REAL on-chain purchase transaction on Soroban
+ * Executes a REAL on-chain purchase transaction on Soroban using the bound payment token
  */
 export async function executePurchase({
   buyerAddress,
   itemId,
   contractId = TESTNET_CONTRACT_ID,
-  paymentToken,
   network = 'TESTNET',
 }: {
   buyerAddress: string;
   itemId: number;
   contractId?: string;
-  paymentToken?: string;
   network?: StellarNetwork;
 }): Promise<{ txHash: string; status: string }> {
-  const tokenToUse = paymentToken || getNativeSacAddress(network);
   const server = getSorobanRpc(network);
   const buyerAcc = await server.getAccount(buyerAddress);
   const contract = new Contract(contractId);
@@ -263,8 +277,7 @@ export async function executePurchase({
       contract.call(
         'purchase',
         new Address(buyerAddress).toScVal(),
-        nativeToScVal(itemId, { type: 'u32' }),
-        new Address(tokenToUse).toScVal()
+        nativeToScVal(itemId, { type: 'u32' })
       )
     )
     .setTimeout(180)
@@ -275,22 +288,157 @@ export async function executePurchase({
 }
 
 /**
- * Executes a REAL on-chain place_and_list transaction on Soroban
+ * Executes a REAL on-chain place transaction (escrow deposit without listing)
  */
-export async function executePlaceAndList({
+export async function executePlace({
   sellerAddress,
+  assetContract,
+  assetAmount = 1,
   title,
   description = '',
-  assetType = 'License',
-  priceInXlm,
+  assetType = 'Pass',
   contractId = TESTNET_CONTRACT_ID,
   network = 'TESTNET',
 }: {
   sellerAddress: string;
+  assetContract?: string;
+  assetAmount?: number | bigint;
   title: string;
   description?: string;
   assetType?: string;
+  contractId?: string;
+  network?: StellarNetwork;
+}): Promise<{ txHash: string; status: string }> {
+  const server = getSorobanRpc(network);
+  const sellerAcc = await server.getAccount(sellerAddress);
+  const contract = new Contract(contractId);
+  const tokenToEscrow = assetContract || getNativeSacAddress(network);
+
+  const baseTx = new TransactionBuilder(sellerAcc, {
+    fee: '15000',
+    networkPassphrase: STELLAR_CONFIG[network].passphrase,
+  })
+    .addOperation(
+      contract.call(
+        'place',
+        new Address(sellerAddress).toScVal(),
+        new Address(tokenToEscrow).toScVal(),
+        nativeToScVal(BigInt(assetAmount), { type: 'i128' }),
+        nativeToScVal(title, { type: 'string' }),
+        nativeToScVal(description, { type: 'string' }),
+        nativeToScVal(assetType, { type: 'string' })
+      )
+    )
+    .setTimeout(180)
+    .build();
+
+  const preparedTx = await server.prepareTransaction(baseTx);
+  return await signAndSubmitTx(preparedTx, sellerAddress, network);
+}
+
+/**
+ * Executes a REAL on-chain list transaction for an already placed asset
+ */
+export async function executeList({
+  sellerAddress,
+  itemId,
+  priceInXlm,
+  paymentToken,
+  contractId = TESTNET_CONTRACT_ID,
+  network = 'TESTNET',
+}: {
+  sellerAddress: string;
+  itemId: number;
   priceInXlm: number;
+  paymentToken?: string;
+  contractId?: string;
+  network?: StellarNetwork;
+}): Promise<{ txHash: string; status: string }> {
+  const server = getSorobanRpc(network);
+  const sellerAcc = await server.getAccount(sellerAddress);
+  const contract = new Contract(contractId);
+  const priceStroops = xlmToStroops(priceInXlm);
+  const tokenToReceive = paymentToken || getNativeSacAddress(network);
+
+  const baseTx = new TransactionBuilder(sellerAcc, {
+    fee: '15000',
+    networkPassphrase: STELLAR_CONFIG[network].passphrase,
+  })
+    .addOperation(
+      contract.call(
+        'list',
+        new Address(sellerAddress).toScVal(),
+        nativeToScVal(itemId, { type: 'u32' }),
+        nativeToScVal(priceStroops, { type: 'i128' }),
+        new Address(tokenToReceive).toScVal()
+      )
+    )
+    .setTimeout(180)
+    .build();
+
+  const preparedTx = await server.prepareTransaction(baseTx);
+  return await signAndSubmitTx(preparedTx, sellerAddress, network);
+}
+
+/**
+ * Executes a REAL on-chain withdraw transaction returning escrowed asset to seller
+ */
+export async function executeWithdraw({
+  callerAddress,
+  itemId,
+  contractId = TESTNET_CONTRACT_ID,
+  network = 'TESTNET',
+}: {
+  callerAddress: string;
+  itemId: number;
+  contractId?: string;
+  network?: StellarNetwork;
+}): Promise<{ txHash: string; status: string }> {
+  const server = getSorobanRpc(network);
+  const callerAcc = await server.getAccount(callerAddress);
+  const contract = new Contract(contractId);
+
+  const baseTx = new TransactionBuilder(callerAcc, {
+    fee: '15000',
+    networkPassphrase: STELLAR_CONFIG[network].passphrase,
+  })
+    .addOperation(
+      contract.call(
+        'withdraw',
+        new Address(callerAddress).toScVal(),
+        nativeToScVal(itemId, { type: 'u32' })
+      )
+    )
+    .setTimeout(180)
+    .build();
+
+  const preparedTx = await server.prepareTransaction(baseTx);
+  return await signAndSubmitTx(preparedTx, callerAddress, network);
+}
+
+/**
+ * Executes a REAL on-chain atomic place_and_list transaction on Soroban
+ */
+export async function executePlaceAndList({
+  sellerAddress,
+  assetContract,
+  assetAmount = 1,
+  paymentToken,
+  priceInXlm,
+  title,
+  description = '',
+  assetType = 'License',
+  contractId = TESTNET_CONTRACT_ID,
+  network = 'TESTNET',
+}: {
+  sellerAddress: string;
+  assetContract?: string;
+  assetAmount?: number | bigint;
+  paymentToken?: string;
+  priceInXlm: number;
+  title: string;
+  description?: string;
+  assetType?: string;
   contractId?: string;
   network?: StellarNetwork;
 }): Promise<{ txHash: string; status: string; nextItemId?: number }> {
@@ -298,6 +446,8 @@ export async function executePlaceAndList({
   const sellerAcc = await server.getAccount(sellerAddress);
   const contract = new Contract(contractId);
   const priceStroops = xlmToStroops(priceInXlm);
+  const tokenToEscrow = assetContract || getNativeSacAddress(network);
+  const tokenToReceive = paymentToken || getNativeSacAddress(network);
 
   const baseTx = new TransactionBuilder(sellerAcc, {
     fee: '15000',
@@ -307,10 +457,13 @@ export async function executePlaceAndList({
       contract.call(
         'place_and_list',
         new Address(sellerAddress).toScVal(),
+        new Address(tokenToEscrow).toScVal(),
+        nativeToScVal(BigInt(assetAmount), { type: 'i128' }),
+        new Address(tokenToReceive).toScVal(),
+        nativeToScVal(priceStroops, { type: 'i128' }),
         nativeToScVal(title, { type: 'string' }),
         nativeToScVal(description, { type: 'string' }),
-        nativeToScVal(assetType, { type: 'string' }),
-        nativeToScVal(priceStroops, { type: 'i128' })
+        nativeToScVal(assetType, { type: 'string' })
       )
     )
     .setTimeout(180)

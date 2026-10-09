@@ -138,11 +138,13 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
                     className={`absolute top-3 right-3 px-2.5 py-1 rounded-full backdrop-blur-md text-[10px] font-mono flex items-center gap-1 ${
                       item.isListed
                         ? 'bg-emerald-500/20 border border-emerald-500/30 text-emerald-300'
+                        : item.status === 'placed'
+                        ? 'bg-amber-500/20 border border-amber-500/30 text-amber-300'
                         : 'bg-zinc-800/80 border border-white/10 text-zinc-400'
                     }`}
                   >
                     {item.isListed && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>}
-                    <span>{item.isListed ? 'LISTED' : 'SETTLED'}</span>
+                    <span>{item.isListed ? 'LISTED' : item.status === 'placed' ? 'ESCROWED' : 'SETTLED'}</span>
                   </div>
                 </div>
 
@@ -181,7 +183,7 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
                       </button>
                     ) : (
                       <span className="px-3.5 py-1.5 rounded-full bg-white/5 border border-white/10 text-[11px] font-mono text-zinc-500">
-                        Settled In Vault
+                        {item.status === 'placed' ? 'Escrowed (Unlisted)' : 'Settled In Vault'}
                       </span>
                     )}
                   </div>

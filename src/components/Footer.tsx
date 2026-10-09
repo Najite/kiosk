@@ -28,7 +28,7 @@ export const Footer: React.FC = () => {
               <ul className="space-y-2.5 text-xs text-zinc-400">
                 <li>
                   <a
-                    href="https://stellar.expert/explorer/testnet/contract/CB3AQGQ6MXJVJ26ICU5CDIGSVUKS2LNCEBMZEVM2GO6RARSJ367CLQQB"
+                    href="https://stellar.expert/explorer/testnet/contract/CDRKM3ZZXKJQ7VHCQUBO3BZWS3NDPWHSVSNDXX54ZFWEW3AMSI224T4R"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="hover:text-purple-300 flex items-center gap-1"
@@ -54,7 +54,7 @@ export const Footer: React.FC = () => {
               <h4 className="text-xs font-mono text-zinc-300 uppercase tracking-wider mb-4">Developers</h4>
               <ul className="space-y-2.5 text-xs text-zinc-400">
                 <li>
-                  <a href="https://github.com/Najite/kiosk" target="_blank" rel="noopener noreferrer" className="hover:text-purple-300 flex items-center gap-1">
+                  <a href="https://github.com/luxver/kiosk" target="_blank" rel="noopener noreferrer" className="hover:text-purple-300 flex items-center gap-1">
                     <Github className="w-3 h-3" />
                     <span>GitHub Repository</span>
                   </a>

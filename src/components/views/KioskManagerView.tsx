@@ -1,8 +1,27 @@
 import React, { useState } from 'react';
 import { ListingItem, AssetCategory } from '../../types';
-import { executePlaceAndList, executeDelist } from '../../lib/soroban';
-import { DEMO_TESTNET_KEYPAIR } from '../../lib/stellar';
-import { Shield, Plus, Trash2, CheckCircle2, Lock, Sparkles, Layers, RefreshCw, AlertCircle, ExternalLink } from 'lucide-react';
+import {
+  executePlaceAndList,
+  executePlace,
+  executeList,
+  executeDelist,
+  executeWithdraw,
+} from '../../lib/soroban';
+import {
+  Shield,
+  Plus,
+  ArrowUpRight,
+  Trash2,
+  CheckCircle2,
+  Lock,
+  Sparkles,
+  Layers,
+  RefreshCw,
+  AlertCircle,
+  ExternalLink,
+  Tag,
+  Download,
+} from 'lucide-react';
 import { useWallet } from '../../context/WalletContext';
 
 interface KioskManagerViewProps {
@@ -25,11 +44,15 @@ export const KioskManagerView: React.FC<KioskManagerViewProps> = ({
   const [description, setDescription] = useState('');
   const [assetType, setAssetType] = useState<AssetCategory>('pass');
   const [price, setPrice] = useState('15');
-  const [badge, setBadge] = useState('Vault Asset');
+  const [mintMode, setMintMode] = useState<'place_and_list' | 'place_only'>('place_and_list');
+
+  // Quick list modal state
+  const [listingItemId, setListingItemId] = useState<number | null>(null);
+  const [listingPrice, setListingPrice] = useState('20');
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title || !description || !price) return;
+    if (!title || !description) return;
 
     if (!isConnected || !address) {
       await connectWallet();
@@ -40,14 +63,32 @@ export const KioskManagerView: React.FC<KioskManagerViewProps> = ({
     setErrorMessage(null);
 
     try {
-      const activeAddress = address || DEMO_TESTNET_KEYPAIR.publicKey;
-      const res = await executePlaceAndList({
-        sellerAddress: activeAddress,
-        title,
-        description,
-        assetType: assetType === 'pass' ? 'Pass' : assetType === 'license' ? 'License' : assetType === 'badge' ? 'Credential' : 'Collectible',
-        priceInXlm: parseFloat(price) || 10,
-      });
+      const typeStr =
+        assetType === 'pass'
+          ? 'Pass'
+          : assetType === 'license'
+          ? 'License'
+          : assetType === 'badge'
+          ? 'Credential'
+          : 'Collectible';
+
+      let res;
+      if (mintMode === 'place_and_list') {
+        res = await executePlaceAndList({
+          sellerAddress: address,
+          title,
+          description,
+          assetType: typeStr,
+          priceInXlm: parseFloat(price) || 10,
+        });
+      } else {
+        res = await executePlace({
+          sellerAddress: address,
+          title,
+          description,
+          assetType: typeStr,
+        });
+      }
 
       setSuccessTxHash(res.txHash);
       await onRefreshData();
@@ -58,7 +99,7 @@ export const KioskManagerView: React.FC<KioskManagerViewProps> = ({
       setPrice('15');
       setShowMintModal(false);
     } catch (err: any) {
-      console.error('On-chain minting failed:', err);
+      console.error('Vault placement failed:', err);
       setErrorMessage(err?.message || 'Transaction rejected by Soroban RPC node.');
     } finally {
       setIsSubmitting(false);
@@ -74,7 +115,7 @@ export const KioskManagerView: React.FC<KioskManagerViewProps> = ({
     setErrorMessage(null);
     try {
       const res = await executeDelist({
-        callerAddress: address || DEMO_TESTNET_KEYPAIR.publicKey,
+        callerAddress: address,
         itemId,
       });
       setSuccessTxHash(res.txHash);
@@ -83,6 +124,50 @@ export const KioskManagerView: React.FC<KioskManagerViewProps> = ({
     } catch (err: any) {
       console.error('Delisting failed:', err);
       setErrorMessage(err?.message || 'Delisting failed on Soroban.');
+    }
+  };
+
+  const handleWithdraw = async (itemId: number) => {
+    if (!isConnected || !address) {
+      await connectWallet();
+      return;
+    }
+
+    setErrorMessage(null);
+    try {
+      const res = await executeWithdraw({
+        callerAddress: address,
+        itemId,
+      });
+      setSuccessTxHash(res.txHash);
+      await onRefreshData();
+      await refreshBalance();
+    } catch (err: any) {
+      console.error('Withdrawal failed:', err);
+      setErrorMessage(err?.message || 'Withdrawal failed on Soroban.');
+    }
+  };
+
+  const handleList = async (itemId: number) => {
+    if (!isConnected || !address) {
+      await connectWallet();
+      return;
+    }
+
+    setErrorMessage(null);
+    try {
+      const res = await executeList({
+        sellerAddress: address,
+        itemId,
+        priceInXlm: parseFloat(listingPrice) || 10,
+      });
+      setSuccessTxHash(res.txHash);
+      setListingItemId(null);
+      await onRefreshData();
+      await refreshBalance();
+    } catch (err: any) {
+      console.error('Listing failed:', err);
+      setErrorMessage(err?.message || 'Listing failed on Soroban.');
     }
   };
 
@@ -211,26 +296,98 @@ export const KioskManagerView: React.FC<KioskManagerViewProps> = ({
                 <h4 className="text-base font-bold text-white mb-1">{item.title}</h4>
                 <p className="text-xs text-zinc-400 mb-4 line-clamp-2">{item.description}</p>
 
-                <div className="mt-auto pt-3 border-t border-white/5 flex items-center justify-between">
+                <div className="mt-auto pt-3 border-t border-white/5 flex flex-wrap items-center justify-between gap-3">
                   <div>
-                    <div className="text-[10px] font-mono text-zinc-500">PRICE</div>
-                    <div className="text-base font-bold font-mono text-white">{item.price} XLM</div>
+                    <div className="text-[10px] font-mono text-zinc-500">
+                      {item.isListed ? 'PRICE' : 'STATUS'}
+                    </div>
+                    <div className="text-base font-bold font-mono text-white">
+                      {item.isListed ? `${item.price} XLM` : 'In Vault'}
+                    </div>
                   </div>
 
-                  {item.isListed && (
-                    <button
-                      onClick={() => handleDelist(item.id)}
-                      className="px-4 py-1.5 rounded-full text-xs font-semibold bg-rose-500/20 text-rose-300 border border-rose-500/30 hover:bg-rose-500/30 transition-all"
-                    >
-                      Delist On-Chain
-                    </button>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {item.isListed ? (
+                      <button
+                        onClick={() => handleDelist(item.id)}
+                        className="px-3.5 py-1.5 rounded-full text-xs font-semibold bg-rose-500/20 text-rose-300 border border-rose-500/30 hover:bg-rose-500/30 transition-all"
+                      >
+                        Delist
+                      </button>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => setListingItemId(item.id)}
+                          className="px-3 py-1.5 rounded-full text-xs font-semibold bg-purple-600/20 text-purple-300 border border-purple-500/30 hover:bg-purple-600/30 transition-all flex items-center gap-1"
+                        >
+                          <Tag className="w-3 h-3" />
+                          <span>List</span>
+                        </button>
+                        <button
+                          onClick={() => handleWithdraw(item.id)}
+                          className="px-3 py-1.5 rounded-full text-xs font-semibold bg-white/5 text-zinc-300 border border-white/10 hover:bg-white/10 transition-all flex items-center gap-1"
+                          title="Withdraw escrowed asset from vault back to your wallet"
+                        >
+                          <Download className="w-3 h-3" />
+                          <span>Withdraw</span>
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
           ))}
         </div>
       </div>
+
+      {/* Quick List Modal */}
+      {listingItemId !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xl animate-in fade-in">
+          <div className="relative w-full max-w-sm double-bezel-outer">
+            <div className="double-bezel-inner p-6 space-y-4">
+              <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                <h4 className="text-sm font-bold text-white">List Vault Asset #{listingItemId}</h4>
+                <button
+                  onClick={() => setListingItemId(null)}
+                  className="text-xs text-zinc-500 hover:text-white font-mono"
+                >
+                  Close
+                </button>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-zinc-400 mb-1.5">
+                  Listing Price (XLM)
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={listingPrice}
+                  onChange={(e) => setListingPrice(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl bg-[#0c0c14] border border-white/10 text-white text-xs focus:outline-none focus:border-purple-500"
+                />
+              </div>
+
+              <div className="pt-2 flex justify-end gap-2">
+                <button
+                  onClick={() => setListingItemId(null)}
+                  className="px-3 py-1.5 rounded-full text-xs text-zinc-400 hover:text-white"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleList(listingItemId)}
+                  className="px-5 py-2 rounded-full bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition-all"
+                >
+                  Confirm Listing
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Mint Modal */}
       {showMintModal && (
@@ -243,8 +400,10 @@ export const KioskManagerView: React.FC<KioskManagerViewProps> = ({
                     <Plus className="w-4 h-4" />
                   </div>
                   <div>
-                    <h3 className="text-lg font-bold text-white">Live On-Chain Minting</h3>
-                    <div className="text-[10px] font-mono text-zinc-400">place_and_list() entry point</div>
+                    <h3 className="text-lg font-bold text-white">On-Chain Asset Vault Deposit</h3>
+                    <div className="text-[10px] font-mono text-zinc-400">
+                      {mintMode === 'place_and_list' ? 'place_and_list() entry point' : 'place() entry point'}
+                    </div>
                   </div>
                 </div>
                 <button
@@ -253,6 +412,32 @@ export const KioskManagerView: React.FC<KioskManagerViewProps> = ({
                   className="text-zinc-500 hover:text-white text-xs font-mono"
                 >
                   ESC / Close
+                </button>
+              </div>
+
+              {/* Mode Toggle */}
+              <div className="flex items-center gap-2 p-1 rounded-xl bg-[#0c0c14] border border-white/5 mb-4 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setMintMode('place_and_list')}
+                  className={`flex-1 py-1.5 rounded-lg font-medium transition-all ${
+                    mintMode === 'place_and_list'
+                      ? 'bg-purple-600 text-white'
+                      : 'text-zinc-400 hover:text-white'
+                  }`}
+                >
+                  Place & List (1-Step)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMintMode('place_only')}
+                  className={`flex-1 py-1.5 rounded-lg font-medium transition-all ${
+                    mintMode === 'place_only'
+                      ? 'bg-purple-600 text-white'
+                      : 'text-zinc-400 hover:text-white'
+                  }`}
+                >
+                  Vault Only (Unlisted)
                 </button>
               </div>
 
@@ -288,7 +473,7 @@ export const KioskManagerView: React.FC<KioskManagerViewProps> = ({
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className={`grid ${mintMode === 'place_and_list' ? 'grid-cols-2' : 'grid-cols-1'} gap-4`}>
                   <div>
                     <label className="block text-xs font-medium text-zinc-400 mb-1.5">Asset Type</label>
                     <select
@@ -303,18 +488,20 @@ export const KioskManagerView: React.FC<KioskManagerViewProps> = ({
                     </select>
                   </div>
 
-                  <div>
-                    <label className="block text-xs font-medium text-zinc-400 mb-1.5">Price (XLM)</label>
-                    <input
-                      type="number"
-                      required
-                      min="1"
-                      step="1"
-                      value={price}
-                      onChange={(e) => setPrice(e.target.value)}
-                      className="w-full px-4 py-2.5 rounded-xl bg-[#0c0c14] border border-white/10 text-white text-xs focus:outline-none focus:border-purple-500"
-                    />
-                  </div>
+                  {mintMode === 'place_and_list' && (
+                    <div>
+                      <label className="block text-xs font-medium text-zinc-400 mb-1.5">Price (XLM)</label>
+                      <input
+                        type="number"
+                        required
+                        min="1"
+                        step="1"
+                        value={price}
+                        onChange={(e) => setPrice(e.target.value)}
+                        className="w-full px-4 py-2.5 rounded-xl bg-[#0c0c14] border border-white/10 text-white text-xs focus:outline-none focus:border-purple-500"
+                      />
+                    </div>
+                  )}
                 </div>
 
                 <div className="pt-4 flex items-center justify-end gap-3">
@@ -337,7 +524,7 @@ export const KioskManagerView: React.FC<KioskManagerViewProps> = ({
                         <span>Broadcasting to Soroban...</span>
                       </>
                     ) : (
-                      <span>Sign & Broadcast Transaction</span>
+                      <span>Deposit into Vault</span>
                     )}
                   </button>
                 </div>
